@@ -1,0 +1,8 @@
+[package]
+name = "complesh"
+version = "0.1.0"
+authors = ["Joshua Miller <jsmiller@uchicago.edu>"]
+
+[dependencies]
+termion = "*"
+quick-error = "1.1.0"

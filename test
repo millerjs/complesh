@@ -1,0 +1,4 @@
+#!/bin/bash
+
+complete -F test -o nospace /Users/jmiller/jsm/complesh/target/debug/complesh
+alias test=echo
