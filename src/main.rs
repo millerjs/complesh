@@ -26,7 +26,7 @@ impl Dropdown {
         Self {
             origin: Goto(1, complesh::sync_cursor_pos(&mut out).unwrap().1),
             stdout: out,
-            height: 4,
+            height: 5,
         }
     }
 
@@ -72,16 +72,16 @@ impl DropdownPrompt {
         Self { dropdown: Dropdown::new() }
     }
 
-    fn prompt<D: Display>(&mut self, prompt: &String, value: &String, lines: &[D]) {
+    fn prompt<D: Display>(&mut self, prompt: &String, value: &String, options: &[D]) {
         let mut dropdown = &mut self.dropdown;
         dropdown.reset();
 
-        for line in lines.iter().take((dropdown.height - 1) as usize) {
+        for line in options.iter().take((dropdown.height - 1) as usize) {
             dropdown.write(Down(1))
                 .clearline()
-                .write(format!("{}", line));
+                .write(format!("   {}", line));
         }
-        if lines.len() > dropdown.height as usize {
+        if options.len() > dropdown.height as usize {
             dropdown.write(PREFIX_ELIPSIS);
         }
         dropdown.goto_origin()
