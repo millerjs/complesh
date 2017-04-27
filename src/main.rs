@@ -10,9 +10,7 @@ use termion::cursor::{Goto, Down};
 use std::fmt::Display;
 use std::cmp::min;
 
-// static PREFIX_CURRENT: &'static str = "-> ";
 static PREFIX_ELIPSIS: &'static str = "   ...";
-// static PREFIX_ENTRY: &'static str = "   ";
 
 
 pub struct Dropdown {
@@ -32,30 +30,35 @@ impl Dropdown {
         }
     }
 
-    fn goto_origin(&mut self) {
+    fn goto_origin(&mut self) -> &mut Self {
         write!(self.stdout, "{}", self.origin).unwrap();
+        self
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self) -> &mut Self {
         self.goto_origin();
         for _ in 0..self.height {
             self.write(format!("{}\n", clear::CurrentLine));
         }
         self.origin.1 = min(self.origin.1, terminal_size().unwrap().1 - self.height);
         self.goto_origin();
+        self
     }
 
-    fn clearline(&mut self) {
+    fn clearline(&mut self) -> &mut Self {
         let y = complesh::sync_cursor_pos(&mut self.stdout).unwrap().1;
         write!(self.stdout, "{}{}", clear::CurrentLine, Goto(1, y)).unwrap();
+        self
     }
 
-    fn write<D>(&mut self, value: D) where D: Display {
+    fn write<D>(&mut self, value: D) -> &mut Self where D: Display {
         write!(self.stdout, "{}", value).unwrap();
+        self
     }
 
-    fn flush(&mut self) {
+    fn flush(&mut self) -> &mut Self {
         self.stdout.flush().unwrap();
+        self
     }
 }
 
@@ -71,19 +74,19 @@ impl DropdownPrompt {
 
     fn prompt<D: Display>(&mut self, prompt: &String, value: &String, lines: &[D]) {
         let mut dropdown = &mut self.dropdown;
-
         dropdown.reset();
+
         for line in lines.iter().take((dropdown.height - 1) as usize) {
-            dropdown.write(Down(1));
-            dropdown.clearline();
-            dropdown.write(format!("{}", line))
+            dropdown.write(Down(1))
+                .clearline()
+                .write(format!("{}", line));
         }
         if lines.len() > dropdown.height as usize {
-            dropdown.write(PREFIX_ELIPSIS)
+            dropdown.write(PREFIX_ELIPSIS);
         }
-        dropdown.goto_origin();
-        dropdown.write(format!("{}{}", prompt, value));
-        dropdown.flush();
+        dropdown.goto_origin()
+            .write(format!("{}{}", prompt, value))
+            .flush();
     }
 }
 
