@@ -2,48 +2,46 @@ extern crate complesh;
 extern crate termion;
 
 use termion::event::Key;
-use termion::{color, clear};
+use termion::{color, clear, terminal_size};
 use termion::input::TermRead;
 use termion::raw::{IntoRawMode, RawTerminal};
 use std::io::{Write, Stdout, stdout, stdin};
 use termion::cursor::{Goto, Down};
 use std::fmt::Display;
-
+use std::cmp::min;
 
 // static PREFIX_CURRENT: &'static str = "-> ";
 static PREFIX_ELIPSIS: &'static str = "   ...";
 // static PREFIX_ENTRY: &'static str = "   ";
 
 
-pub struct PopupPrompt {
+pub struct Dropdown {
     pub stdout: RawTerminal<Stdout>,
-    pub start_x: u16,
-    pub start_y: u16,
+    pub origin: Goto,
     pub height: u16,
 }
 
 
-impl PopupPrompt {
+impl Dropdown {
     fn new() -> Self {
         let mut out = stdout().into_raw_mode().unwrap();
-        let (start_x, start_y) = complesh::sync_cursor_pos(&mut out).unwrap();
         Self {
+            origin: Goto(1, complesh::sync_cursor_pos(&mut out).unwrap().1),
             stdout: out,
-            start_x: start_x,
-            start_y: start_y,
             height: 4,
         }
     }
 
     fn goto_origin(&mut self) {
-        write!(self.stdout, "{}", Goto(1, self.start_y)).unwrap();
+        write!(self.stdout, "{}", self.origin).unwrap();
     }
 
-    pub fn clear(&mut self) {
+    pub fn reset(&mut self) {
         self.goto_origin();
-        for _ in 0..self.height+2 {
-            self.write(clear::CurrentLine);
+        for _ in 0..self.height {
+            self.write(format!("{}\n", clear::CurrentLine));
         }
+        self.origin.1 = min(self.origin.1, terminal_size().unwrap().1 - self.height);
         self.goto_origin();
     }
 
@@ -56,33 +54,41 @@ impl PopupPrompt {
         write!(self.stdout, "{}", value).unwrap();
     }
 
-    fn max_lines(&self) -> usize {
-        (self.height-1) as usize
-    }
-
-    fn prompt<D: Display>(&mut self, prompt: &String, value: &String, lines: &[D]) {
-        self.clear();
-        for line in lines.iter().take(self.max_lines()) {
-            self.write(Down(1));
-            self.clearline();
-            self.write(format!("{}", line))
-        }
-        if lines.len() > self.max_lines() {
-            self.write(PREFIX_ELIPSIS)
-        }
-        self.goto_origin();
-        self.write(format!("{}{}", prompt, value));
-        self.flush();
-    }
-
     fn flush(&mut self) {
         self.stdout.flush().unwrap();
     }
 }
 
 
+pub struct DropdownPrompt {
+    dropdown: Dropdown,
+}
+
+impl DropdownPrompt {
+    fn new() -> Self {
+        Self { dropdown: Dropdown::new() }
+    }
+
+    fn prompt<D: Display>(&mut self, prompt: &String, value: &String, lines: &[D]) {
+        let mut dropdown = &mut self.dropdown;
+
+        dropdown.reset();
+        for line in lines.iter().take((dropdown.height - 1) as usize) {
+            dropdown.write(Down(1));
+            dropdown.clearline();
+            dropdown.write(format!("{}", line))
+        }
+        if lines.len() > dropdown.height as usize {
+            dropdown.write(PREFIX_ELIPSIS)
+        }
+        dropdown.goto_origin();
+        dropdown.write(format!("{}{}", prompt, value));
+        dropdown.flush();
+    }
+}
+
 fn main() {
-    let mut popup = PopupPrompt::new();
+    let mut popup = DropdownPrompt::new();
     let mut value = String::new();
     let prompt = format!("{}enter text: {}", color::Fg(color::Green), color::Fg(color::Reset));
     let stdin = stdin();
@@ -103,5 +109,5 @@ fn main() {
         popup.prompt(&prompt, &value, &["first", &*value, "third", "fourth"]);
     }
 
-    popup.clear();
+    popup.dropdown.reset();
 }
