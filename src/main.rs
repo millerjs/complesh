@@ -2,7 +2,7 @@ extern crate complesh;
 extern crate termion;
 
 use termion::event::Key;
-use termion::{color, clear, terminal_size};
+use termion::{color, clear, terminal_size, style};
 use termion::input::TermRead;
 use termion::raw::{IntoRawMode, RawTerminal};
 use std::io::{Write, Stdout, stdout, stdin};
@@ -90,7 +90,9 @@ impl DropdownPrompt {
 fn main() {
     let mut popup = DropdownPrompt::new();
     let mut value = String::new();
-    let prompt = format!("{}enter text: {}", color::Fg(color::Green), color::Fg(color::Reset));
+    let prompt = format!("{}{}enter text: {}{}",
+                         style::Bold, color::Fg(color::Blue),
+                         color::Fg(color::Reset), style::Reset);
     let stdin = stdin();
 
     popup.prompt(&prompt, &value, &["first", &*value, "third", "fourth"]);
