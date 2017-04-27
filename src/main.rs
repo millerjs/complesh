@@ -2,97 +2,106 @@ extern crate complesh;
 extern crate termion;
 
 use termion::event::Key;
+use termion::{color, clear};
 use termion::input::TermRead;
 use termion::raw::{IntoRawMode, RawTerminal};
-use std::io::{Write, Stdout, Stdin, stdout, stdin};
+use std::io::{Write, Stdout, stdout, stdin};
 use termion::cursor::{Goto, Down};
-use std::fmt::Debug;
+use std::fmt::Display;
 
-macro_rules! write_down {
-    ($dst:expr, $fmt:expr) => {{
-        let y = Goto(1, complesh::sync_cursor_pos(&mut $dst).unwrap().1);
-        write!($dst, "{}", termion::clear::CurrentLine).unwrap();
-        write!($dst, concat!("{}", $fmt), y).unwrap();
-        write!($dst, "{}", Down(1)).unwrap();
-    }};
-    ($dst:expr, $fmt:expr, $($arg:tt)*) => {{
-        let y = Goto(1, complesh::sync_cursor_pos(&mut $dst).unwrap().1);
-        write!($dst, "{}", termion::clear::CurrentLine).unwrap();
-        write!($dst, concat!("{}", $fmt), y, $($arg)*).unwrap();
-        write!($dst, "{}", Down(1)).unwrap();
-    }};
-}
 
-pub struct Terminal {
+// static PREFIX_CURRENT: &'static str = "-> ";
+static PREFIX_ELIPSIS: &'static str = "   ...";
+// static PREFIX_ENTRY: &'static str = "   ";
+
+
+pub struct PopupPrompt {
     pub stdout: RawTerminal<Stdout>,
     pub start_x: u16,
     pub start_y: u16,
-    pub limit: u16,
+    pub height: u16,
 }
 
 
-impl Terminal {
-    fn new() -> Terminal {
+impl PopupPrompt {
+    fn new() -> Self {
         let mut out = stdout().into_raw_mode().unwrap();
-        let (start_x, mut start_y) = complesh::sync_cursor_pos(&mut out).unwrap();
-        Terminal {
+        let (start_x, start_y) = complesh::sync_cursor_pos(&mut out).unwrap();
+        Self {
             stdout: out,
             start_x: start_x,
             start_y: start_y,
-            limit: 4,
+            height: 4,
         }
     }
 
-    fn write_all<D: Debug>(&mut self, current: &String, values: &Vec<D>, limit: usize) {
-        write_down!(self.stdout, "{}{}", Goto(1, self.start_y), current);
-        write_down!(self.stdout, "-> {:?}", values.iter().next());
-        for value in values.iter().skip(1).take(limit-1) {
-            write_down!(self.stdout, "   {:?}", value);
+    fn goto_origin(&mut self) {
+        write!(self.stdout, "{}", Goto(1, self.start_y)).unwrap();
+    }
+
+    pub fn clear(&mut self) {
+        self.goto_origin();
+        for _ in 0..self.height+2 {
+            self.write(clear::CurrentLine);
         }
-        write_down!(self.stdout, "{}", Goto(current.len() as u16, self.start_y-1));
+        self.goto_origin();
+    }
+
+    fn clearline(&mut self) {
+        let y = complesh::sync_cursor_pos(&mut self.stdout).unwrap().1;
+        write!(self.stdout, "{}{}", Goto(1, y), clear::CurrentLine).unwrap();
+    }
+
+    fn write<D>(&mut self, value: D) where D: Display {
+        write!(self.stdout, "{}", value).unwrap();
+    }
+
+    fn max_lines(&self) -> usize {
+        (self.height-1) as usize
+    }
+
+    fn prompt<D: Display>(&mut self, prompt: &String, value: &String, lines: &[D]) {
+        self.clear();
+        for line in lines.iter().take(self.max_lines()) {
+            self.write(Down(1));
+            self.clearline();
+            self.write(format!("{}", line))
+        }
+        if lines.len() > self.max_lines() {
+            self.write(PREFIX_ELIPSIS)
+        }
+        self.goto_origin();
+        self.write(format!("{}{}", prompt, value));
+        self.flush();
+    }
+
+    fn flush(&mut self) {
         self.stdout.flush().unwrap();
-    }
-
-    fn initialize(&mut self) {
-        let (width, height) = termion::terminal_size().unwrap();
-        while self.start_y > height - self.limit + 1 {
-            write!(self.stdout, "\n");
-            self.start_y -= 1;
-        }
-    }
-
-    fn teardown(&mut self) {
-        write!(self.stdout, "{}", Goto(self.start_x, self.start_y));
-        for _ in 0..self.limit {
-            write_down!(self.stdout, "{}", termion::clear::CurrentLine);
-        }
     }
 }
 
 
 fn main() {
-    let mut terminal = Terminal::new();
+    let mut popup = PopupPrompt::new();
     let mut value = String::new();
+    let prompt = format!("{}enter text: {}", color::Fg(color::Green), color::Fg(color::Reset));
     let stdin = stdin();
 
-    terminal.initialize();
-    terminal.write_all(&value, &vec![""], 3);
+    popup.prompt(&prompt, &value, &["first", &*value, "third", "fourth"]);
 
     for c in stdin.keys() {
         match c.unwrap() {
             Key::Ctrl('c')  => break,
-            Key::Char('\n') => (),
+            Key::Ctrl('d')  => if value.len() == 0 { break },
+            Key::Char('\n') => break,
+            Key::Backspace  => { value.pop(); },
+            Key::Ctrl('u')  => value = "".to_string(),
             Key::Char(c)    => value += &*c.to_string(),
             _               => (),
         }
 
-        terminal.write_all(&value, &vec![
-            "first",
-            "second",
-            "third",
-            "fourth",
-        ], 4);
+        popup.prompt(&prompt, &value, &["first", &*value, "third", "fourth"]);
     }
 
-    terminal.teardown();
+    popup.clear();
 }
