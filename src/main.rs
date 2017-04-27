@@ -47,7 +47,7 @@ impl Dropdown {
 
     fn clearline(&mut self) {
         let y = complesh::sync_cursor_pos(&mut self.stdout).unwrap().1;
-        write!(self.stdout, "{}{}", Goto(1, y), clear::CurrentLine).unwrap();
+        write!(self.stdout, "{}{}", clear::CurrentLine, Goto(1, y)).unwrap();
     }
 
     fn write<D>(&mut self, value: D) where D: Display {
