@@ -6,3 +6,5 @@ authors = ["Joshua Miller <jsmiller@uchicago.edu>"]
 [dependencies]
 termion = "*"
 quick-error = "1.1.0"
+nlp-tokenize = "*"
+regex = "0.2"
