@@ -9,19 +9,24 @@ use termion::event::Key;
 use termion::input::TermRead;
 
 
-use std::fmt::Display;
-fn log<D>(value: D) where D: Display {
-    use std::io::prelude::*;
-    use std::fs::OpenOptions;
-    let path = "/Users/jmiller/complesh.log";
-    let mut file = OpenOptions::new().write(true).create(true).append(true).open(path).unwrap();
-    file.write_all(format!("{}", value).as_bytes()).unwrap();
-    file.flush().unwrap();
-}
+// use std::fmt::Display;
+// fn log<D>(value: D) where D: Display {
+//     use std::io::prelude::*;
+//     use std::fs::OpenOptions;
+//     let path = "/Users/jmiller/complesh.log";
+//     let mut file = OpenOptions::new().write(true).create(true).append(true).open(path).unwrap();
+//     file.write_all(format!("{}", value).as_bytes()).unwrap();
+//     file.flush().unwrap();
+// }
 
 
 pub struct ReadlineState {
     value: String,
+    cursor: usize,
+}
+
+pub struct RingBuffer<T> {
+    values: Vec<T>,
     cursor: usize,
 }
 
@@ -31,12 +36,15 @@ pub struct Readline {
     keys: Receiver<Result<Key, io::Error>>,
     tokenizer: WhitePunctTokenizer,
     state_history: Vec<ReadlineState>,
+    kill_ring: RingBuffer<String>,
+    last_event: ReadEvent,
 }
 
 
 pub enum ReadEvent {
     Exit,
     Other,
+    Yank,
 }
 
 
@@ -77,6 +85,31 @@ pub enum ReadlineGoto {
 }
 
 
+impl<T: Clone> RingBuffer<T> {
+    pub fn new() -> Self {
+        Self { values: Vec::new(), cursor: 0 }
+    }
+
+    pub fn insert(&mut self, value: T) {
+        self.rotate();
+        self.values.insert(self.cursor, value);
+    }
+
+    pub fn rotate(&mut self) {
+        self.cursor += 1;
+        if self.cursor >= self.values.len() {
+            self.cursor = 0;
+        }
+    }
+
+    pub fn current(&self) -> Option<T> {
+        match self.values.len() {
+            0 => None,
+            _ => Some(self.values[self.cursor].clone()),
+        }
+    }
+}
+
 impl Readline {
     pub fn new() -> Self {
         Self {
@@ -85,16 +118,18 @@ impl Readline {
             keys: async_keys(),
             tokenizer: WhitePunctTokenizer::new(),
             state_history: vec![ReadlineState { value: String::new(), cursor: 0 }],
+            kill_ring: RingBuffer::new(),
+            last_event: ReadEvent::Other,
         }
     }
 
-    pub fn recv(&mut self) -> ReadEvent {
+    pub fn recv<'a>(&'a mut self) -> &'a ReadEvent {
         let key = self.keys.recv().unwrap().unwrap();
-        // log(format!("{:?}", key));
+        let mut event = ReadEvent::Other;
         match key {
-            Key::Ctrl('c')     => return ReadEvent::Exit,
-            Key::Char('\n')    => return ReadEvent::Exit,
-            Key::Ctrl('d')     => if self.value.len() == 0 { return ReadEvent::Exit },
+            Key::Ctrl('c')     => event = ReadEvent::Exit,
+            Key::Char('\n')    => event = ReadEvent::Exit,
+            Key::Ctrl('d')     => if self.value.len() == 0 { event = ReadEvent::Exit },
             Key::Backspace     => self.backspace(),
             Key::Ctrl('h')     => self.backspace(),
             Key::Ctrl('e')     => self.move_cursor(ReadlineGoto::EndOfLine),
@@ -106,17 +141,36 @@ impl Readline {
             Key::Ctrl('f')     => self.move_cursor(ReadlineGoto::ForwardsCharacter),
             Key::Right         => self.move_cursor(ReadlineGoto::ForwardsCharacter),
             Key::Alt('\u{7f}') => self.backspace_word(),
+            Key::Ctrl('y')     => { self.yank();      event = ReadEvent::Yank },
+            Key::Alt('y')      => { self.yank_next(); event = ReadEvent::Yank },
             Key::Ctrl('7')     => self.pop_state(),
-            Key::Ctrl('u')     => self.clear_before_cursor(),
-            Key::Ctrl('k')     => self.clear_after_cursor(),
+            Key::Ctrl('u')     => self.kill_before_cursor(),
+            Key::Ctrl('k')     => self.kill_after_cursor(),
             Key::Char(c)       => self.write(&*c.to_string()),
             _                  => (),
         };
-        ReadEvent::Other
+        self.last_event = event;
+        &self.last_event
     }
 
     fn push_state(&mut self) {
         self.state_history.push(ReadlineState {value: self.value.clone(), cursor: self.cursor });
+    }
+
+    pub fn yank(&mut self) {
+        if let Some(yanked) = self.kill_ring.current() {
+            self.push_state();
+            self.write(&*yanked);
+            self.last_event = ReadEvent::Yank;
+        }
+    }
+
+    pub fn yank_next(&mut self) {
+        if let ReadEvent::Yank = self.last_event {
+            self.pop_state();
+            self.kill_ring.rotate();
+            self.yank();
+        }
     }
 
     pub fn pop_state(&mut self) {
@@ -137,20 +191,22 @@ impl Readline {
     pub fn backspace_word(&mut self) {
         self.push_state();
         let start = self.previous_word_start();
+        self.kill_ring.insert(self.value[start..self.cursor].to_string());
         self.value = format!("{}{}", &self.value[..start], &self.value[self.cursor..]);
         self.cursor = start;
     }
 
-    pub fn clear_before_cursor(&mut self) {
+    pub fn kill_before_cursor(&mut self) {
         self.push_state();
+        self.kill_ring.insert(self.value[..self.cursor].to_string());
         self.value = self.value[self.cursor..].to_string();
         self.cursor = 0;
     }
 
-    pub fn clear_after_cursor(&mut self) {
+    pub fn kill_after_cursor(&mut self) {
         self.push_state();
+        self.kill_ring.insert(self.value[self.cursor..].to_string());
         self.value = self.value[..self.cursor].to_string();
-        self.cursor = self.value.len();
     }
 
     pub fn write(&mut self, value: &str) {
@@ -179,24 +235,12 @@ impl Readline {
 
     pub fn move_cursor(&mut self, to: ReadlineGoto) {
         match to {
-            ReadlineGoto::BeginningOfLine => {
-                self.cursor = 0;
-            },
-            ReadlineGoto::EndOfLine => {
-                self.cursor = self.value.len();
-            },
-            ReadlineGoto::BackwardsCharacter => {
-                self.increment_cursor(-1)
-            },
-            ReadlineGoto::BackwardsWord => {
-                self.cursor = self.previous_word_start();
-            },
-            ReadlineGoto::ForwardsCharacter => {
-                self.increment_cursor(1)
-            },
-            ReadlineGoto::ForwardsWord => {
-                self.cursor = self.next_word_end();
-            },
+            ReadlineGoto::BeginningOfLine    => self.cursor = 0,
+            ReadlineGoto::EndOfLine          => self.cursor = self.value.len(),
+            ReadlineGoto::BackwardsCharacter => self.increment_cursor(-1),
+            ReadlineGoto::BackwardsWord      => self.cursor = self.previous_word_start(),
+            ReadlineGoto::ForwardsCharacter  => self.increment_cursor(1),
+            ReadlineGoto::ForwardsWord       => self.cursor = self.next_word_end(),
         }
     }
 }

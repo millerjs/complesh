@@ -17,7 +17,7 @@ fn main() {
     popup.prompt(&prompt, &readline.value, &["first", &*readline.value, "third", "fourth"]);
 
     loop {
-        if let ReadEvent::Exit = readline.recv() { break }
+        if let ReadEvent::Exit = *readline.recv() { break }
         popup.prompt(&prompt, &readline.value, &["first", &*readline.value, "third", "fourth"]);
         popup.dropdown.set_cursor((prompt.width() + readline.cursor) as u16);
     }
