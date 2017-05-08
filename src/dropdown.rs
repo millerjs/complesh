@@ -12,6 +12,7 @@ static PREFIX_ELIPSIS: &str = "   ...";
 
 pub struct Dropdown {
     stdout: RawTerminal<Stdout>,
+    start: Goto,
     origin: Goto,
     max_height: u16,
     height: u16,
@@ -20,11 +21,14 @@ pub struct Dropdown {
 impl Dropdown {
     pub fn new(height: u16) -> Self {
         let mut out = stdout().into_raw_mode().unwrap();
+        let (x, y) = sync_cursor_pos(&mut out).unwrap();
+        let origin = if x == 1 { Goto(1, y) } else { Goto(1, y+1) };
         Self {
-            origin: Goto(1, sync_cursor_pos(&mut out).unwrap().1),
+            start: Goto(x, y),
             stdout: out,
             height: height,
             max_height: height,
+            origin
         }
     }
 
@@ -66,6 +70,12 @@ impl Dropdown {
     pub fn set_cursor(&mut self, x: u16) {
         write!(self.stdout, "\r{}", Right(x)).unwrap();
         self.flush();
+    }
+
+    pub fn teardown(&mut self) {
+        self.reset();
+        let start = self.start;
+        self.write(start);
     }
 }
 

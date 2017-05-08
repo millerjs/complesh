@@ -4,5 +4,5 @@ extern crate nlp_tokenize;
 extern crate regex;
 
 pub mod errors;
-pub mod readline;
+pub mod readkeys;
 pub mod dropdown;
