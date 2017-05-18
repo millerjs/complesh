@@ -105,7 +105,7 @@ impl<T: Clone> RingBuffer<T> {
         }
     }
 
-    pub fn current(&self) -> Option<T> {
+    pub fn clone_current(&self) -> Option<T> {
         match self.values.len() {
             0 => None,
             _ => Some(self.values[self.cursor].clone()),
@@ -114,15 +114,16 @@ impl<T: Clone> RingBuffer<T> {
 }
 
 impl Readkeys {
-    pub fn new() -> Self {
+    pub fn new<S: Into<String>>(value: S) -> Self {
+        let value = value.into();
         Self {
-            value: String::new(),
-            cursor: 0,
+            cursor: value.len(),
             keys: async_keys(),
             tokenizer: WhitePunctTokenizer::new(),
             state_history: Vec::new(),
             kill_ring: RingBuffer::new(),
             last_event: ReadEvent::Other,
+            value,
         }
     }
 
@@ -162,7 +163,7 @@ impl Readkeys {
     }
 
     pub fn yank(&mut self) {
-        if let Some(yanked) = self.kill_ring.current() {
+        if let Some(yanked) = self.kill_ring.clone_current() {
             self.push_state();
             self.write(&*yanked);
             self.last_event = ReadEvent::Yank;

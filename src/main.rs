@@ -1,21 +1,21 @@
 extern crate clap;
 extern crate complesh;
 extern crate termion;
+extern crate nix;
+extern crate glob;
 
-use termion::{color, style};
-use complesh::dropdown::{Dropdown, DropdownPrompt};
-use complesh::readkeys::{Readkeys, ReadEvent, Printable};
+use clap::{Arg, App};
+use complesh::dropdown::Dropdown;
+use complesh::completer::{Completer, FileCompleter};
+use complesh::prompt::DropdownPrompt;
+use complesh::readkeys::Readkeys;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::stdout;
-use clap::{Arg, App};
-
-
-fn get_prompt() -> String {
-    format!("{}{}enter text: {}{}",
-            style::Bold, color::Fg(color::Blue),
-            color::Fg(color::Reset), style::Reset)
-}
+use termion::color::{self, Blue, Fg};
+// use termion::style::{self, Bold};
+use std::fmt::Display;
+use glob::glob;
 
 
 fn main() {
@@ -33,31 +33,28 @@ fn main() {
              .long("output")
              .help("Output file path")
              .takes_value(true))
+        .arg(Arg::with_name("INPUT")
+             .short("-i")
+             .long("input")
+             .help("Input starting point for completion")
+             .takes_value(true))
         .get_matches();
 
-    let height: u16 = matches.value_of("HEIGHT").unwrap_or("5").parse()
+    let height = matches.value_of("HEIGHT").unwrap_or("10").parse()
         .expect("Height must but an integer between 0 and 65535.");
+    let beginning = matches.value_of("INPUT").unwrap_or("").to_string();
+    let output_path = matches.value_of("OUTPUT");
 
-    let mut popup = DropdownPrompt::new(Dropdown::new(height));
-    let mut readkeys = Readkeys::new();
+    let output = Dropdown::new(height);
+    let input = Readkeys::new(beginning.clone());
+    let prompt_str = format!("{}complesh: {}", Fg(Blue), Fg(color::Reset));
+    let mut prompt = DropdownPrompt::new(prompt_str, input, output, FileCompleter);
 
-    let prompt = get_prompt();
-    popup.prompt(&prompt, &readkeys.value, &["first", &*readkeys.value, "third", "fourth"]);
+    let completion = prompt.prompt(&beginning);
 
-    loop {
-        match *readkeys.recv() {
-            ReadEvent::Exit | ReadEvent::Submit => break,
-            _ => ()
-        };
-        popup.prompt(&prompt, &readkeys.value, &["first", &*readkeys.value, "third", "fourth"]);
-        popup.dropdown.set_cursor((prompt.width() + readkeys.cursor) as u16);
-    }
-
-    popup.dropdown.teardown();
-
-    if let Some(path) = matches.value_of("OUTPUT") {
-        File::create(path).unwrap().write_all(readkeys.value.as_bytes()).unwrap();
+    if let Some(path) = output_path {
+        File::create(path).unwrap().write_all(completion.as_bytes()).unwrap();
     } else {
-        stdout().write_all(readkeys.value.as_bytes()).unwrap();
+        stdout().write_all(completion.as_bytes()).unwrap();
     }
 }
