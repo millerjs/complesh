@@ -1,4 +1,4 @@
-use termion::cursor::{Goto, Down, Right};
+use termion::cursor::{Goto, Right};
 use termion::raw::{IntoRawMode, RawTerminal};
 use termion::{clear, terminal_size};
 use std::io::{Write, Stdout, stdout};
@@ -6,7 +6,6 @@ use std::fmt::Display;
 use std::cmp::{min};
 
 use ::util;
-use ::completer::{DefaultCompleter, Completer};
 
 pub struct Dropdown {
     stdout: RawTerminal<Stdout>,
@@ -17,15 +16,15 @@ pub struct Dropdown {
 }
 
 impl Dropdown {
-    pub fn new(height: u16) -> Self {
+    pub fn new(max_height: u16) -> Self {
         let mut out = stdout().into_raw_mode().unwrap();
         let (x, y) = util::sync_cursor_pos(&mut out).unwrap();
         let origin = if x == 1 { Goto(1, y) } else { Goto(1, y+1) };
          Self {
             start: Goto(x, y),
             stdout: out,
-            height: height,
-            max_height: height,
+            height: max_height,
+            max_height,
             origin
         }
     }
@@ -36,7 +35,7 @@ impl Dropdown {
     }
 
     pub fn resize(&mut self) -> &mut Self {
-        self.height = min(terminal_size().unwrap().1, self.max_height);
+        self.height = min(util::window_height(), self.max_height);
         self
     }
 

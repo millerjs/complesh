@@ -1,55 +1,80 @@
-use std::fs::File;
 use std::fmt::Display;
-use termion::cursor::{Goto, Down, Right};
+use termion::cursor::Down;
+use termion::clear;
 
 use ::dropdown::Dropdown;
 use ::completer::Completer;
 use ::readkeys::{Readkeys, ReadEvent, Printable};
 
-static PREFIX_ELIPSIS: &str = "   ...";
-
 pub struct DropdownPrompt<C: Completer> {
     dropdown: Dropdown,
-    completer: C,
     prompt: String,
     readkeys: Readkeys,
+    completer: Box<C>,
 }
 
 impl<C> DropdownPrompt<C> where C: Completer {
-    pub fn new(prompt: String, readkeys: Readkeys, dropdown: Dropdown, completer: C) -> Self {
+    pub fn new(prompt: String, readkeys: Readkeys, dropdown: Dropdown, completer: Box<C>) -> Self {
         Self { prompt, readkeys, dropdown, completer }
     }
 
-    pub fn render<D: Display>(&mut self, lines: &[D]) {
-        let max_lines = (self.dropdown.max_height - 1) as usize;
-        let mut lines = lines.iter();
+    fn current(&mut self) -> String {
+        self.complete().iter().next().unwrap_or(&self.readkeys.value).clone().without_escape_codes()
+    }
 
-        if let Some(line) = lines.next() {
+    fn complete(&mut self) -> Vec<String> {
+        let max_lines = self.max_lines();
+        self.completer.complete(&self.readkeys.value, max_lines)
+    }
+
+    fn max_lines(&self) -> usize {
+        (self.dropdown.max_height - 1) as usize
+    }
+
+    fn render_prompt(&mut self) {
+        let prompt_line = format!("{}{}{}", clear::CurrentLine, self.prompt, self.readkeys.value);
+        self.dropdown.goto_origin().write(prompt_line).flush();
+        let cursor = self.readkeys.cursor;
+        self.dropdown.set_cursor((self.prompt.width() + cursor) as u16);
+    }
+
+    fn render_dropdown<D: Display>(&mut self, lines: &[D]) {
+        let max_lines = self.max_lines();
+        let mut lines_iter = lines.iter();
+
+        if let Some(line) = lines_iter.next() {
             self.dropdown.write(Down(1)).clearline().write(format!("-> {}", line));
         }
 
-        for line in lines.take(max_lines) {
+        for line in lines_iter.take(max_lines) {
             self.dropdown.write(Down(1)).clearline().write(format!("   {}", line));
+        }
+
+        for _ in 0..(max_lines - lines.len()) {
+            self.dropdown.write(Down(1)).clearline();
         }
     }
 
-    pub fn prompt(&mut self, beginning: &String) -> String {
-        let max_lines = (self.dropdown.max_height - 1) as usize;
-        self.dropdown.goto_origin().write(format!("{}{}", self.prompt, beginning)).flush();
-        let value = self.readkeys.value.clone();
-        self.render(&*C::complete(value, max_lines));
+    fn prompt_next<'a>(&'a mut self) -> &'a ReadEvent {
+        let values = self.complete();
+        self.render_dropdown(&*values);
+        self.render_prompt();
+        self.readkeys.recv()
+    }
+
+    pub fn prompt(&mut self) -> Option<String> {
+        self.dropdown.goto_origin();
 
         loop {
-            match *self.readkeys.recv() {
-                ReadEvent::Exit | ReadEvent::Submit | ReadEvent::Tab => break,
-                _ => ()
+            match *self.prompt_next() {
+                ReadEvent::Exit => return None,
+                ReadEvent::Submit => return Some(self.current()),
+                ReadEvent::Tab => {
+                    let value = self.current();
+                    self.readkeys.set_value(value);
+                    self.render_prompt();
+                }, _ => ()
             };
-            let value = self.readkeys.value.clone();
-            self.render(&*C::complete(value, max_lines));
-            let cursor = self.readkeys.cursor;
-            self.dropdown.set_cursor((self.prompt.width() + cursor) as u16);
         }
-
-        self.readkeys.value.clone()
     }
 }

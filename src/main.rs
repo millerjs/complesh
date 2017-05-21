@@ -6,17 +6,13 @@ extern crate glob;
 
 use clap::{Arg, App};
 use complesh::dropdown::Dropdown;
-use complesh::completer::{Completer, FileCompleter};
+use complesh::completer::RecursiveCompleter;
 use complesh::prompt::DropdownPrompt;
 use complesh::readkeys::Readkeys;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::stdout;
 use termion::color::{self, Blue, Fg};
-// use termion::style::{self, Bold};
-use std::fmt::Display;
-use glob::glob;
-
 
 fn main() {
     let matches = App::new("complesh")
@@ -40,17 +36,21 @@ fn main() {
              .takes_value(true))
         .get_matches();
 
-    let height = matches.value_of("HEIGHT").unwrap_or("10").parse()
+    let height = matches.value_of("HEIGHT").unwrap_or("32").parse()
         .expect("Height must but an integer between 0 and 65535.");
     let beginning = matches.value_of("INPUT").unwrap_or("").to_string();
     let output_path = matches.value_of("OUTPUT");
 
     let output = Dropdown::new(height);
     let input = Readkeys::new(beginning.clone());
+    let completer = Box::new(RecursiveCompleter::new());
     let prompt_str = format!("{}complesh: {}", Fg(Blue), Fg(color::Reset));
-    let mut prompt = DropdownPrompt::new(prompt_str, input, output, FileCompleter);
+    let mut prompt = DropdownPrompt::new(prompt_str, input, output, completer);
 
-    let completion = prompt.prompt(&beginning);
+    let completion = match prompt.prompt() {
+        Some(completion) => completion,
+        None => return,
+    };
 
     if let Some(path) = output_path {
         File::create(path).unwrap().write_all(completion.as_bytes()).unwrap();

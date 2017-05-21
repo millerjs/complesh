@@ -4,6 +4,7 @@ extern crate nix;
 extern crate nlp_tokenize;
 extern crate regex;
 extern crate termion;
+extern crate walkdir;
 
 pub mod completer;
 pub mod dropdown;

@@ -3,6 +3,7 @@ use nix::unistd;
 use std::io::{self, Write, Stdout, Read, stdin};
 use std::time::{SystemTime, Duration};
 use termion::raw::CONTROL_SEQUENCE_TIMEOUT;
+use termion::terminal_size;
 
 /// Vendor this function with a small modification to avoid panic
 pub fn sync_cursor_pos(stdout: &mut Stdout) -> io::Result<(u16, u16)> {
@@ -44,4 +45,9 @@ pub fn sync_cursor_pos(stdout: &mut Stdout) -> io::Result<(u16, u16)> {
 /// Sends SIGWINCH to parent process to get it to redraw as necessary
 pub fn redraw_window() {
     signal::kill(unistd::getppid(), signal::Signal::SIGWINCH).unwrap();
+}
+
+
+pub fn window_height() -> u16 {
+    terminal_size().unwrap().1
 }

@@ -8,18 +8,6 @@ use std::thread;
 use termion::event::Key;
 use termion::input::TermRead;
 
-
-// use std::fmt::Display;
-// fn log<D>(value: D) where D: Display {
-//     use std::io::prelude::*;
-//     use std::fs::OpenOptions;
-//     let path = "/Users/jmiller/complesh.log";
-//     let mut file = OpenOptions::new().write(true).create(true).append(true).open(path).unwrap();
-//     file.write_all(format!("{}", value).as_bytes()).unwrap();
-//     file.flush().unwrap();
-// }
-
-
 pub struct ReadkeysState {
     value: String,
     cursor: usize,
@@ -40,7 +28,6 @@ pub struct Readkeys {
     last_event: ReadEvent,
 }
 
-
 pub enum ReadEvent {
     Exit,
     Submit,
@@ -48,8 +35,8 @@ pub enum ReadEvent {
     Tab,
     Other,
     Yank,
+    Key(Key),
 }
-
 
 pub trait Printable {
     fn width(&self) -> usize;
@@ -76,7 +63,6 @@ pub fn async_keys() -> Receiver<Result<Key, io::Error>> {
     });
     rx
 }
-
 
 pub enum Goto {
     BeginningOfLine,
@@ -129,7 +115,7 @@ impl Readkeys {
 
     pub fn recv<'a>(&'a mut self) -> &'a ReadEvent {
         let key = self.keys.recv().unwrap().unwrap();
-        let mut event = ReadEvent::Other;
+        let mut event = ReadEvent::Key(key);
         match key {
             Key::Ctrl('c')     => event = ReadEvent::Exit,
             Key::Char('\n')    => event = ReadEvent::Submit,
@@ -230,7 +216,6 @@ impl Readkeys {
         min(self.value.len(), max(0, cursor) as usize) as usize
     }
 
-
     fn previous_word_start(&self) -> usize {
         let tokens = self.tokenizer.tokenize(&self.value[..self.cursor]);
         if tokens.len() > 0 { tokens[tokens.len() - 1].0 } else { self.cursor }
@@ -250,6 +235,11 @@ impl Readkeys {
             Goto::ForwardsCharacter  => self.increment_cursor(1),
             Goto::ForwardsWord       => self.cursor = self.next_word_end(),
         }
+    }
+
+    pub fn set_value(&mut self, value: String) {
+        self.value = value;
+        self.move_cursor(Goto::EndOfLine);
     }
 }
 
