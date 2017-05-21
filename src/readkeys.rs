@@ -8,13 +8,10 @@ use std::thread;
 use termion::event::Key;
 use termion::input::TermRead;
 
+use ::ring_buffer::RingBuffer;
+
 pub struct ReadkeysState {
     value: String,
-    cursor: usize,
-}
-
-pub struct RingBuffer<T> {
-    values: Vec<T>,
     cursor: usize,
 }
 
@@ -71,32 +68,6 @@ pub enum Goto {
     BackwardsWord,
     ForwardsCharacter,
     ForwardsWord,
-}
-
-
-impl<T: Clone> RingBuffer<T> {
-    pub fn new() -> Self {
-        Self { values: Vec::new(), cursor: 0 }
-    }
-
-    pub fn insert(&mut self, value: T) {
-        self.rotate();
-        self.values.insert(self.cursor, value);
-    }
-
-    pub fn rotate(&mut self) {
-        self.cursor += 1;
-        if self.cursor >= self.values.len() {
-            self.cursor = 0;
-        }
-    }
-
-    pub fn clone_current(&self) -> Option<T> {
-        match self.values.len() {
-            0 => None,
-            _ => Some(self.values[self.cursor].clone()),
-        }
-    }
 }
 
 impl Readkeys {
@@ -159,7 +130,7 @@ impl Readkeys {
     pub fn yank_next(&mut self) {
         if let ReadEvent::Yank = self.last_event {
             self.pop_state();
-            self.kill_ring.rotate();
+            self.kill_ring.forward();
             self.yank();
         }
     }

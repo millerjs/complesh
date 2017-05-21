@@ -12,3 +12,4 @@ pub mod errors;
 pub mod readkeys;
 pub mod util;
 pub mod prompt;
+pub mod ring_buffer;

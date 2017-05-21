@@ -1,30 +1,32 @@
-use std::fmt::Display;
 use termion::cursor::Down;
 use termion::clear;
+use termion::event::Key;
 
 use ::dropdown::Dropdown;
 use ::completer::Completer;
 use ::readkeys::{Readkeys, ReadEvent, Printable};
+use ::ring_buffer::RingBuffer;
 
 pub struct DropdownPrompt<C: Completer> {
     dropdown: Dropdown,
     prompt: String,
     readkeys: Readkeys,
     completer: Box<C>,
+    values: RingBuffer<String>,
 }
 
 impl<C> DropdownPrompt<C> where C: Completer {
     pub fn new(prompt: String, readkeys: Readkeys, dropdown: Dropdown, completer: Box<C>) -> Self {
-        Self { prompt, readkeys, dropdown, completer }
+        Self { values: RingBuffer::new(), prompt, readkeys, dropdown, completer }
     }
 
     fn current(&mut self) -> String {
-        self.complete().iter().next().unwrap_or(&self.readkeys.value).clone().without_escape_codes()
+        self.values.current().unwrap_or(&self.readkeys.value).clone().without_escape_codes()
     }
 
-    fn complete(&mut self) -> Vec<String> {
+    fn complete(&mut self) {
         let max_lines = self.max_lines();
-        self.completer.complete(&self.readkeys.value, max_lines)
+        self.values = self.completer.complete(&self.readkeys.value, max_lines);
     }
 
     fn max_lines(&self) -> usize {
@@ -38,32 +40,37 @@ impl<C> DropdownPrompt<C> where C: Completer {
         self.dropdown.set_cursor((self.prompt.width() + cursor) as u16);
     }
 
-    fn render_dropdown<D: Display>(&mut self, lines: &[D]) {
+    fn render_dropdown(&mut self) {
+        let mut lines = self.values.iter();
         let max_lines = self.max_lines();
-        let mut lines_iter = lines.iter();
+        let mut n_lines = 0;
 
-        if let Some(line) = lines_iter.next() {
+        if let Some(line) = lines.next() {
             self.dropdown.write(Down(1)).clearline().write(format!("-> {}", line));
+            n_lines += 1;
         }
 
-        for line in lines_iter.take(max_lines) {
+        for line in lines.take(max_lines) {
             self.dropdown.write(Down(1)).clearline().write(format!("   {}", line));
+            n_lines += 1;
         }
 
-        for _ in 0..(max_lines - lines.len()) {
-            self.dropdown.write(Down(1)).clearline();
+        if n_lines < max_lines {
+            for _ in 0..(max_lines - n_lines) {
+                self.dropdown.write(Down(1)).clearline();
+            }
         }
     }
 
     fn prompt_next<'a>(&'a mut self) -> &'a ReadEvent {
-        let values = self.complete();
-        self.render_dropdown(&*values);
+        self.render_dropdown();
         self.render_prompt();
         self.readkeys.recv()
     }
 
     pub fn prompt(&mut self) -> Option<String> {
         self.dropdown.goto_origin();
+        self.complete();
 
         loop {
             match *self.prompt_next() {
@@ -73,7 +80,16 @@ impl<C> DropdownPrompt<C> where C: Completer {
                     let value = self.current();
                     self.readkeys.set_value(value);
                     self.render_prompt();
-                }, _ => ()
+                },
+                ReadEvent::Key(Key::Down) | ReadEvent::Key(Key::Ctrl('n')) => {
+                    self.values.forward();
+                },
+                ReadEvent::Key(Key::Up) | ReadEvent::Key(Key::Ctrl('p')) => {
+                    self.values.back();
+                },
+                _ => {
+                    self.complete();
+                }
             };
         }
     }

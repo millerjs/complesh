@@ -4,6 +4,16 @@ use std::io::{self, Write, Stdout, Read, stdin};
 use std::time::{SystemTime, Duration};
 use termion::raw::CONTROL_SEQUENCE_TIMEOUT;
 use termion::terminal_size;
+use std::fmt::Display;
+
+pub fn log<D>(value: D) where D: Display {
+    use std::io::prelude::*;
+    use std::fs::OpenOptions;
+    let path = "complesh.log";
+    let mut file = OpenOptions::new().write(true).create(true).append(true).open(path).unwrap();
+    file.write_all(format!("{}", value).as_bytes()).unwrap();
+    file.flush().unwrap();
+}
 
 /// Vendor this function with a small modification to avoid panic
 pub fn sync_cursor_pos(stdout: &mut Stdout) -> io::Result<(u16, u16)> {

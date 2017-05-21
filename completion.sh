@@ -6,11 +6,9 @@ completion_function() {
     rm "${path}"
 }
 
-test () {
-    echo "test '$@'"
-}
-
-COMPLESH_COMMANDS="ls cd cat wc touch cp mv rm test"
+if [ -z "$COMPLESH_COMMANDS" ]; then
+    COMPLESH_COMMANDS="ls cd cat wc touch cp mv rm open"
+fi
 
 for command in $COMPLESH_COMMANDS
 do

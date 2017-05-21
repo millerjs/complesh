@@ -1,4 +1,5 @@
 use ::completer::{Completer, emphasize};
+use ::ring_buffer::RingBuffer;
 use glob::glob;
 
 pub enum GlobCompleter {}
@@ -11,11 +12,12 @@ impl GlobCompleter {
 }
 
 impl Completer for GlobCompleter {
-    fn complete(&mut self, query: &str, limit: usize) -> Vec<String> {
-        glob(format!("{}*", query).as_str()).unwrap()
-            .map(|path| format!("{}", path.unwrap().as_path().to_str().unwrap()))
-            .take(limit)
-            .map(|path| self.highlight_completion(query, &*path))
-            .collect::<Vec<_>>()
+    fn complete(&mut self, query: &str, limit: usize) -> RingBuffer<String> {
+        RingBuffer::from_vec(
+            glob(format!("{}*", query).as_str()).unwrap()
+                .map(|path| format!("{}", path.unwrap().as_path().to_str().unwrap()))
+                .take(limit)
+                .map(|path| self.highlight_completion(query, &*path))
+                .collect::<Vec<_>>())
     }
 }

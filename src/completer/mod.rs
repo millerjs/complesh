@@ -1,9 +1,10 @@
 use std::fmt::Display;
 use termion::color::{self, Green, Fg};
 use termion::style::{self, Underline, Bold};
+use ::ring_buffer::RingBuffer;
 
 pub trait Completer {
-    fn complete(&mut self, query: &str, limit: usize) -> Vec<String>;
+    fn complete(&mut self, query: &str, limit: usize) -> RingBuffer<String>;
 }
 
 fn emphasize<D: Display>(value: D) -> String {
