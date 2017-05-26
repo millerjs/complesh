@@ -1,10 +1,15 @@
-use walkdir::WalkDir;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::env::home_dir;
-use ::completer::{Completer, emphasize};
+use ::completer::Completer;
 use ::ring_buffer::RingBuffer;
+use ::filter::Filter;
+use ignore;
+use std::sync::Arc;
 
+use crossbeam::sync::MsQueue;
+use ignore::WalkBuilder;
+use ignore::WalkState::Continue;
 
 pub struct RecursiveCompleter {
     cache: HashMap<String, Vec<String>>,
@@ -13,61 +18,22 @@ pub struct RecursiveCompleter {
 }
 
 
-struct WeightedMatch {
-    weight: f32,
-    result: String,
-}
+fn walk_dir_ignore(path: &str, max_depth: usize) -> Vec<String> {
+    let queue: Arc<MsQueue<Option<ignore::DirEntry>>> = Arc::new(MsQueue::new());
+    let stdout_queue = queue.clone();
 
-fn expand_user(path: &str) -> String {
-    if path.starts_with("~/") {
-        if let Some(home) = home_dir() {
-            home.display().to_string() + &path[2..]
-        } else {
-            path.to_string()
-        }
-    } else {
-        path.to_string()
+    let walker = WalkBuilder::new(path).threads(16).max_depth(Some(max_depth)).build_parallel();
+    walker.run(|| {
+        let queue = queue.clone();
+        Box::new(move |result| { queue.push(Some(result.unwrap())); Continue })
+    });
+    queue.push(None);
+
+    let mut paths = vec![];
+    while let Some(dent) = stdout_queue.pop() {
+        paths.push(dent.path().to_string_lossy().to_string())
     }
-}
-
-
-fn spaced_match_highlight(query: &str, value: &str) -> Option<WeightedMatch> {
-    let mut query = expand_user(query).to_lowercase().chars().rev().collect::<String>();
-    let mut result = String::with_capacity(value.len());
-
-    let mut c_query_opt = query.pop();
-    let mut run = 0;
-    let mut weight = 0.0;
-
-    for c_value in value.to_string().to_lowercase().chars() {
-        if let Some(c_query) = c_query_opt {
-            if c_query == c_value {
-                result += &*emphasize(c_value);
-                c_query_opt = query.pop();
-                if run > 0 {
-                    weight += 1.0;
-                }
-                run += 1;
-            } else {
-                run = 0;
-                result.push(c_value);
-            }
-        } else {
-            run = 0;
-            result.push(c_value);
-        }
-    }
-
-    if result.starts_with("./") {
-        result = result[2..].to_string();
-    }
-
-    if query.is_empty() {
-        let weight = weight / (value.len() as f32);
-        Some(WeightedMatch { result, weight })
-    } else {
-        None
-    }
+    paths
 }
 
 impl RecursiveCompleter {
@@ -96,13 +62,7 @@ impl RecursiveCompleter {
 
     fn cache<'a>(&'a mut self) -> &'a Vec<String>{
         if !self.cache.contains_key(&self.root) {
-            let root = &self.root;
-            let paths = WalkDir::new(&*root)
-                .max_depth(self.max_depth)
-                .into_iter()
-                .filter_map(|e| e.ok())
-                .map(|e| e.path().display().to_string())
-                .collect();
+            let paths = walk_dir_ignore(&*self.root, self.max_depth);
             self.cache.insert(self.root.clone(), paths);
         }
         &self.cache[&self.root]
@@ -110,10 +70,10 @@ impl RecursiveCompleter {
 }
 
 impl Completer for RecursiveCompleter {
-    fn complete(&mut self, query: &str, limit: usize) -> RingBuffer<String> {
+    fn complete<F: Filter>(&mut self, query: &str, limit: usize) -> RingBuffer<String> {
         self.update_root(query);
         let mut completions: Vec<_> = self.cache().iter()
-            .filter_map(|p| spaced_match_highlight(query, p))
+            .filter_map(|p| F::matched(query, p))
             .collect();
         completions.sort_by(|a, b| b.weight.partial_cmp(&a.weight).unwrap_or(Ordering::Equal));
         RingBuffer::from_vec(

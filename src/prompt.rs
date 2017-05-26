@@ -1,9 +1,10 @@
-use termion::cursor::Down;
 use termion::clear;
+use termion::cursor::Down;
 use termion::event::Key;
 
-use ::dropdown::Dropdown;
 use ::completer::Completer;
+use ::dropdown::Dropdown;
+use ::filter::SpacedFilter;
 use ::readkeys::{Readkeys, ReadEvent, Printable};
 use ::ring_buffer::RingBuffer;
 
@@ -26,7 +27,7 @@ impl<C> DropdownPrompt<C> where C: Completer {
 
     fn complete(&mut self) {
         let max_lines = self.max_lines();
-        self.values = self.completer.complete(&self.readkeys.value, max_lines);
+        self.values = self.completer.complete::<SpacedFilter>(&self.readkeys.value, max_lines);
     }
 
     fn max_lines(&self) -> usize {

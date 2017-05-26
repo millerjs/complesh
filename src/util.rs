@@ -5,6 +5,9 @@ use std::time::{SystemTime, Duration};
 use termion::raw::CONTROL_SEQUENCE_TIMEOUT;
 use termion::terminal_size;
 use std::fmt::Display;
+use termion::color::{self, Green, Fg};
+use termion::style::{self, Underline, Bold};
+use std::env::home_dir;
 
 pub fn log<D>(value: D) where D: Display {
     use std::io::prelude::*;
@@ -60,4 +63,20 @@ pub fn redraw_window() {
 
 pub fn window_height() -> u16 {
     terminal_size().unwrap().1
+}
+
+pub fn expand_user(path: &str) -> String {
+    if path.starts_with("~/") {
+        if let Some(home) = home_dir() {
+            home.display().to_string() + &path[2..]
+        } else {
+            path.to_string()
+        }
+    } else {
+        path.to_string()
+    }
+}
+
+pub fn emphasize<D: Display>(value: D) -> String {
+    format!("{}{}{}{}{}{}", Fg(Green), Underline, Bold, value, Fg(color::Reset), style::Reset)
 }

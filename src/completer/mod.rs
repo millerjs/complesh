@@ -1,14 +1,8 @@
-use std::fmt::Display;
-use termion::color::{self, Green, Fg};
-use termion::style::{self, Underline, Bold};
 use ::ring_buffer::RingBuffer;
+use ::filter::Filter;
 
 pub trait Completer {
-    fn complete(&mut self, query: &str, limit: usize) -> RingBuffer<String>;
-}
-
-fn emphasize<D: Display>(value: D) -> String {
-    format!("{}{}{}{}{}{}", Fg(Green), Underline, Bold, value, Fg(color::Reset), style::Reset)
+    fn complete<F: Filter>(&mut self, query: &str, limit: usize) -> RingBuffer<String>;
 }
 
 mod glob;
