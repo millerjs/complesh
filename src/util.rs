@@ -1,13 +1,14 @@
+use std::process::Command;
 use nix::sys::signal;
 use nix::unistd;
+use std::env::home_dir;
+use std::fmt::Display;
 use std::io::{self, Write, Stdout, Read, stdin};
 use std::time::{SystemTime, Duration};
-use termion::raw::CONTROL_SEQUENCE_TIMEOUT;
-use termion::terminal_size;
-use std::fmt::Display;
 use termion::color::{self, Green, Fg};
+use termion::raw::CONTROL_SEQUENCE_TIMEOUT;
 use termion::style::{self, Underline, Bold};
-use std::env::home_dir;
+use termion::terminal_size;
 
 pub fn log<D>(value: D) where D: Display {
     use std::io::prelude::*;
@@ -79,4 +80,18 @@ pub fn expand_user(path: &str) -> String {
 
 pub fn emphasize<D: Display>(value: D) -> String {
     format!("{}{}{}{}{}{}", Fg(Green), Underline, Bold, value, Fg(color::Reset), style::Reset)
+}
+
+
+pub fn git_root() -> Option<String> {
+    match Command::new("git").arg("rev-parse").arg("--show-toplevel").output() {
+        Ok(path) => Some(String::from_utf8(path.stdout).unwrap().trim().to_string()),
+        Err(_) => None,
+    }
+}
+
+
+#[test]
+fn test_git_root() {
+    assert!(git_root().is_some())
 }

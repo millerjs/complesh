@@ -1,12 +1,11 @@
-use termion::clear;
 use termion::cursor::Down;
+use termion::clear;
 use termion::event::Key;
-
-use ::completer::Completer;
 use ::dropdown::Dropdown;
-use ::filter::SpacedFilter;
+use ::completer::Completer;
 use ::readkeys::{Readkeys, ReadEvent, Printable};
 use ::ring_buffer::RingBuffer;
+use ::filter::SpacedFilter;
 
 pub struct DropdownPrompt<C: Completer> {
     dropdown: Dropdown,
