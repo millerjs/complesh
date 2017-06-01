@@ -16,7 +16,7 @@ impl MixedCompleter {
 
 impl Completer for MixedCompleter {
     fn complete<F: Filter>(&mut self, query: &str, limit: usize) -> RingBuffer<String> {
-        if git_root().is_some() {
+        if git_root(".").is_some() {
             self.git.complete::<F>(query, limit)
         } else {
             self.glob.complete::<F>(query, limit)

@@ -14,9 +14,8 @@ use ignore::WalkState::Continue;
 
 pub struct GitCompleter {
     cache: HashMap<String, Vec<String>>,
-    root: String,
-    max_depth: usize,
-    cwd: String,
+    pub max_depth: usize,
+    pub root: String,
 }
 
 fn walk_dir_ignore(path: &str, max_depth: usize) -> Vec<String> {
@@ -43,7 +42,6 @@ impl GitCompleter {
             cache: HashMap::new(),
             root: ".".to_string(),
             max_depth: 5,
-            cwd: current_dir().unwrap().display().to_string(),
         }
     }
 
@@ -58,7 +56,7 @@ impl GitCompleter {
             self.root = "/".to_string();
         } else if query.starts_with("./") {
             self.root = ".".to_string()
-        } else if let Some(root) = git_root() {
+        } else if let Some(root) = git_root(".") {
             self.root = root;
         } else {
             self.root = ".".to_string();
@@ -79,15 +77,17 @@ impl Completer for GitCompleter {
         self.update_root(query);
         let root = self.root.clone() + "/";
 
+        use ::util::log;
         let mut completions: Vec<_> = self.cache().iter()
             .map(|p| p.replace(&*root, ""))
+            .inspect(|p| log(format!("{}\n", p)))
             .filter_map(|p| F::matched(query, &*p))
             .collect();
 
         completions.sort_by(WeightedMatch::cmp);
         RingBuffer::from_vec(
             completions.into_iter()
-                .map(|comp| format!("{}/{}", self.root, comp.result))
+                .map(|comp| comp.result.to_string())
                 .take(limit)
                 .collect())
     }

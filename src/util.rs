@@ -9,6 +9,7 @@ use termion::color::{self, Green, Fg};
 use termion::raw::CONTROL_SEQUENCE_TIMEOUT;
 use termion::style::{self, Underline, Bold};
 use termion::terminal_size;
+use std::env;
 
 pub fn log<D>(value: D) where D: Display {
     use std::io::prelude::*;
@@ -82,12 +83,24 @@ pub fn emphasize<D: Display>(value: D) -> String {
     format!("{}{}{}{}{}{}", Fg(Green), Underline, Bold, value, Fg(color::Reset), style::Reset)
 }
 
+pub fn within_dir<F, T>(path: &str, f: F) -> Option<T>
+    where F: FnOnce() -> T
+{
+    let cwd = env::current_dir();
+    if cwd.is_err()                        { return None };
+    if env::set_current_dir(path).is_err() { return None };
+    let result = f();
+    env::set_current_dir(cwd.unwrap());
+    Some(result)
+}
 
-pub fn git_root() -> Option<String> {
-    match Command::new("git").arg("rev-parse").arg("--show-toplevel").output() {
-        Ok(path) => Some(String::from_utf8(path.stdout).unwrap().trim().to_string()),
-        Err(_) => None,
-    }
+pub fn git_root(path: &str) -> Option<String> {
+    within_dir(path, || {
+        match Command::new("git").arg("rev-parse").arg("--show-toplevel").output() {
+            Ok(path) => Some(String::from_utf8(path.stdout).unwrap().trim().to_string()),
+            Err(_) => None,
+        }
+    }).unwrap()
 }
 
 pub fn find_all(value: &str, pat: &str) -> Vec<usize> {
@@ -106,7 +119,7 @@ pub fn find_all(value: &str, pat: &str) -> Vec<usize> {
 
 #[test]
 fn test_git_root() {
-    assert!(git_root().is_some())
+    assert!(git_root(".").is_some())
 }
 
 
