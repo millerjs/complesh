@@ -6,7 +6,7 @@ extern crate glob;
 
 use clap::{Arg, App};
 use complesh::dropdown::Dropdown;
-use complesh::completer::RecursiveCompleter;
+use complesh::completer::MixedCompleter;
 use complesh::prompt::DropdownPrompt;
 use complesh::readkeys::Readkeys;
 use std::fs::File;
@@ -43,7 +43,7 @@ fn main() {
 
     let output = Dropdown::new(height);
     let input = Readkeys::new(beginning.clone());
-    let completer = Box::new(RecursiveCompleter::new());
+    let completer = Box::new(MixedCompleter::new());
     let prompt_str = format!("{}complesh: {}", Fg(Blue), Fg(color::Reset));
     let mut prompt = DropdownPrompt::new(prompt_str, input, output, completer);
 

@@ -1,9 +1,11 @@
-use termion::cursor::{Goto, Right};
+use termion::cursor::{Goto, Right, Down};
 use termion::raw::{IntoRawMode, RawTerminal};
 use termion::{clear, terminal_size};
 use std::io::{Write, Stdout, stdout};
 use std::fmt::Display;
-use std::cmp::{min};
+use std::cmp::{max, min};
+
+const MIN_HEIGHT: u16 = 5;
 
 use ::util;
 
@@ -12,7 +14,7 @@ pub struct Dropdown {
     start: Goto,
     origin: Goto,
     pub max_height: u16,
-    height: u16,
+    pub height: u16,
 }
 
 impl Dropdown {
@@ -20,7 +22,7 @@ impl Dropdown {
         let mut out = stdout().into_raw_mode().unwrap();
         let (x, y) = util::sync_cursor_pos(&mut out).unwrap();
         let origin = if x == 1 { Goto(1, y) } else { Goto(1, y+1) };
-         Self {
+        Self {
             start: Goto(x, y),
             stdout: out,
             height: max_height,
@@ -35,7 +37,7 @@ impl Dropdown {
     }
 
     pub fn resize(&mut self) -> &mut Self {
-        self.height = min(util::window_height(), self.max_height);
+        self.height = max(MIN_HEIGHT, min(util::window_height() - self.start.1, self.max_height));
         self
     }
 
@@ -59,6 +61,10 @@ impl Dropdown {
         self
     }
 
+    pub fn writeln<D>(&mut self, value: D) -> &mut Self where D: Display {
+        self.write(Down(1)).clearline().write(value)
+    }
+
     pub fn flush(&mut self) -> &mut Self {
         self.stdout.flush().unwrap();
         self
@@ -70,10 +76,10 @@ impl Dropdown {
     }
 
     pub fn teardown(&mut self) {
+        util::redraw_window();
         self.reset();
         let start = self.start;
         self.write(start);
-        util::redraw_window()
     }
 }
 

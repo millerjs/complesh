@@ -90,8 +90,27 @@ pub fn git_root() -> Option<String> {
     }
 }
 
+pub fn find_all(value: &str, pat: &str) -> Vec<usize> {
+    let mut index = 0;
+    let mut found = vec![];
+    loop {
+        match value[index..].find(pat) {
+            Some(new_index) => {
+                found.push(index + new_index);
+                index += new_index + 1;
+            }, None => break,
+        }
+    }
+    found
+}
 
 #[test]
 fn test_git_root() {
     assert!(git_root().is_some())
+}
+
+
+#[test]
+fn test_find_all() {
+    assert_eq!(find_all("a/bc/d//", "/"), vec![1, 4, 6, 7])
 }

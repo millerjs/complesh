@@ -7,6 +7,7 @@ pub struct RingBuffer<T> {
 pub struct RingBufferIter<'a, T: 'a> {
     buffer: &'a RingBuffer<T>,
     cursor: usize,
+    iter_count: usize,
 }
 
 impl<T: Clone> RingBuffer<T> {
@@ -54,13 +55,14 @@ impl<T: Clone> RingBuffer<T> {
     }
 
     pub fn iter<'a>(&'a self) -> RingBufferIter<'a, T> {
-        RingBufferIter { buffer: self, cursor: self.cursor }
+        RingBufferIter { buffer: self, cursor: self.cursor, iter_count: 0 }
     }
 }
 
 
 impl<'a, T: Clone> RingBufferIter<'a, T> {
     pub fn forward(&mut self) {
+        self.iter_count += 1;
         self.cursor += 1;
         if self.cursor >= self.buffer.values.len() {
             self.cursor = 0;
@@ -68,9 +70,10 @@ impl<'a, T: Clone> RingBufferIter<'a, T> {
     }
 
     pub fn current(&'a self) -> Option<&'a T> {
-        match self.buffer.values.len() {
-            0 => None,
-            _ => Some(&self.buffer.values[self.cursor]),
+        if self.cursor >= self.buffer.values.len() {
+            None
+        } else {
+            Some(&self.buffer.values[self.cursor])
         }
     }
 }
@@ -79,6 +82,7 @@ impl<'a, T: Clone> Iterator for RingBufferIter<'a, T> {
     type Item = T;
 
     fn next(&mut self) -> Option<T> {
+        if self.iter_count == self.buffer.len() { return None }
         let value = self.current().map(|c| c.clone());
         self.forward();
         value

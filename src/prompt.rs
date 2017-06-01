@@ -1,4 +1,3 @@
-use termion::cursor::Down;
 use termion::clear;
 use termion::event::Key;
 use ::dropdown::Dropdown;
@@ -30,7 +29,7 @@ impl<C> DropdownPrompt<C> where C: Completer {
     }
 
     fn max_lines(&self) -> usize {
-        (self.dropdown.max_height - 1) as usize
+        (self.dropdown.height - 1) as usize
     }
 
     fn render_prompt(&mut self) {
@@ -46,18 +45,18 @@ impl<C> DropdownPrompt<C> where C: Completer {
         let mut n_lines = 0;
 
         if let Some(line) = lines.next() {
-            self.dropdown.write(Down(1)).clearline().write(format!("-> {}", line));
+            self.dropdown.writeln(format!("-> {}", line));
             n_lines += 1;
         }
 
         for line in lines.take(max_lines) {
-            self.dropdown.write(Down(1)).clearline().write(format!("   {}", line));
+            self.dropdown.writeln(format!("   {}", line));
             n_lines += 1;
         }
 
         if n_lines < max_lines {
             for _ in 0..(max_lines - n_lines) {
-                self.dropdown.write(Down(1)).clearline();
+                self.dropdown.writeln("");
             }
         }
     }
@@ -69,25 +68,31 @@ impl<C> DropdownPrompt<C> where C: Completer {
     }
 
     pub fn prompt(&mut self) -> Option<String> {
-        self.dropdown.goto_origin();
+        self.dropdown.reset();
         self.complete();
+        let mut tabbed = false;
 
         loop {
             match *self.prompt_next() {
                 ReadEvent::Exit => return None,
                 ReadEvent::Submit => return Some(self.current()),
                 ReadEvent::Tab => {
+                    if tabbed { return Some(self.current()) }
+                    tabbed = true;
                     let value = self.current();
                     self.readkeys.set_value(value);
                     self.render_prompt();
                 },
                 ReadEvent::Key(Key::Down) | ReadEvent::Key(Key::Ctrl('n')) => {
+                    tabbed = false;
                     self.values.forward();
                 },
                 ReadEvent::Key(Key::Up) | ReadEvent::Key(Key::Ctrl('p')) => {
+                    tabbed = false;
                     self.values.back();
                 },
                 _ => {
+                    tabbed = false;
                     self.complete();
                 }
             };

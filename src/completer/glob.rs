@@ -3,7 +3,7 @@ use ::ring_buffer::RingBuffer;
 use ::filter::Filter;
 use glob::glob;
 
-pub enum GlobCompleter {}
+pub struct GlobCompleter {}
 
 impl Completer for GlobCompleter {
     fn complete<F: Filter>(&mut self, query: &str, limit: usize) -> RingBuffer<String> {
