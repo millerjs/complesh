@@ -19,7 +19,7 @@ impl<C> DropdownPrompt<C> where C: Completer {
         Self { values: RingBuffer::new(), prompt, readkeys, dropdown, completer }
     }
 
-    fn current(&mut self) -> String {
+    fn current(&self) -> String {
         self.values.current().unwrap_or(&self.readkeys.value).clone().without_escape_codes()
     }
 
@@ -40,9 +40,9 @@ impl<C> DropdownPrompt<C> where C: Completer {
     }
 
     fn render_dropdown(&mut self) {
+        let mut n_lines = 0;
         let mut lines = self.values.iter();
         let max_lines = self.max_lines();
-        let mut n_lines = 0;
 
         if let Some(line) = lines.next() {
             self.dropdown.writeln(format!("-> {}", line));
@@ -67,34 +67,28 @@ impl<C> DropdownPrompt<C> where C: Completer {
         self.readkeys.recv()
     }
 
-    pub fn prompt(&mut self) -> Option<String> {
-        self.dropdown.reset();
-        self.complete();
-        let mut tabbed = false;
+    fn padded(&self) -> String {
+        format!("{} ", self.current())
+    }
 
+    pub fn prompt(&mut self) -> Option<String> {
+        self.complete();
+
+        // If there's only one option on the fist complete, then
+        // assume it's correct
+        if self.values.len() == 1 { return Some(self.padded()) }
+
+        self.dropdown.reset();
         loop {
             match *self.prompt_next() {
-                ReadEvent::Exit => return None,
-                ReadEvent::Submit => return Some(self.current()),
-                ReadEvent::Tab => {
-                    if tabbed { return Some(self.current()) }
-                    tabbed = true;
-                    let value = self.current();
-                    self.readkeys.set_value(value);
-                    self.render_prompt();
-                },
-                ReadEvent::Key(Key::Down) | ReadEvent::Key(Key::Ctrl('n')) => {
-                    tabbed = false;
-                    self.values.forward();
-                },
-                ReadEvent::Key(Key::Up) | ReadEvent::Key(Key::Ctrl('p')) => {
-                    tabbed = false;
-                    self.values.back();
-                },
-                _ => {
-                    tabbed = false;
-                    self.complete();
-                }
+                ReadEvent::Exit                => return None,
+                ReadEvent::Submit              => return Some(self.padded()),
+                ReadEvent::Tab                 => return Some(self.padded()),
+                ReadEvent::Key(Key::Ctrl('n')) => self.values.forward(),
+                ReadEvent::Key(Key::Down)      => self.values.forward(),
+                ReadEvent::Key(Key::Ctrl('p')) => self.values.back(),
+                ReadEvent::Key(Key::Up)        => self.values.back(),
+                _                              => self.complete(),
             };
         }
     }

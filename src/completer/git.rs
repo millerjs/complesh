@@ -6,7 +6,6 @@ use ::filter::{Filter, WeightedMatch};
 use ::util::git_root;
 use ignore;
 use std::sync::Arc;
-use std::env::current_dir;
 
 use crossbeam::sync::MsQueue;
 use ignore::WalkBuilder;
@@ -77,10 +76,8 @@ impl Completer for GitCompleter {
         self.update_root(query);
         let root = self.root.clone() + "/";
 
-        use ::util::log;
         let mut completions: Vec<_> = self.cache().iter()
             .map(|p| p.replace(&*root, ""))
-            .inspect(|p| log(format!("{}\n", p)))
             .filter_map(|p| F::matched(query, &*p))
             .collect();
 

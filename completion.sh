@@ -1,7 +1,13 @@
-completion_function() {
+_complesh() {
     path=$(mktemp)
-    CDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-    "${CDIR}/target/release/complesh" -o "${path}" -i "${COMP_WORDS[COMP_CWORD]}"
+    complesh -o "${path}" -i "${COMP_WORDS[COMP_CWORD]}"
+    COMPREPLY[0]=$(cat "${path}")
+    rm "${path}"
+}
+
+_complesh_choices() {
+    path=$(mktemp)
+    complesh -o "${path}" -i "${COMP_WORDS[COMP_CWORD]}" -c "$@"
     COMPREPLY[0]=$(cat "${path}")
     rm "${path}"
 }
@@ -12,5 +18,5 @@ fi
 
 for command in $COMPLESH_COMMANDS
 do
-    complete -F completion_function -o nospace $command
+    complete -F _complesh -o nospace $command
 done

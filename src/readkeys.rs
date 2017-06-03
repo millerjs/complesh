@@ -89,6 +89,7 @@ impl Readkeys {
         let mut event = ReadEvent::Key(key);
         match key {
             Key::Ctrl('c')     => event = ReadEvent::Exit,
+            Key::Ctrl('g')     => event = ReadEvent::Exit,
             Key::Char('\n')    => event = ReadEvent::Submit,
             Key::Char('\t')    => event = ReadEvent::Tab,
             Key::Ctrl('d')     => if self.value.len() == 0 { event = ReadEvent::Exit },

@@ -86,11 +86,10 @@ pub fn emphasize<D: Display>(value: D) -> String {
 pub fn within_dir<F, T>(path: &str, f: F) -> Option<T>
     where F: FnOnce() -> T
 {
-    let cwd = env::current_dir();
-    if cwd.is_err()                        { return None };
+    let cwd = env::current_dir().unwrap();
     if env::set_current_dir(path).is_err() { return None };
     let result = f();
-    env::set_current_dir(cwd.unwrap());
+    env::set_current_dir(cwd).unwrap();
     Some(result)
 }
 
@@ -103,27 +102,7 @@ pub fn git_root(path: &str) -> Option<String> {
     }).unwrap()
 }
 
-pub fn find_all(value: &str, pat: &str) -> Vec<usize> {
-    let mut index = 0;
-    let mut found = vec![];
-    loop {
-        match value[index..].find(pat) {
-            Some(new_index) => {
-                found.push(index + new_index);
-                index += new_index + 1;
-            }, None => break,
-        }
-    }
-    found
-}
-
 #[test]
 fn test_git_root() {
     assert!(git_root(".").is_some())
-}
-
-
-#[test]
-fn test_find_all() {
-    assert_eq!(find_all("a/bc/d//", "/"), vec![1, 4, 6, 7])
 }

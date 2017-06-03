@@ -1,0 +1,25 @@
+use ::completer::Completer;
+use ::ring_buffer::RingBuffer;
+use ::filter::{Filter, WeightedMatch};
+
+pub struct ListCompleter {
+    choices: Vec<String>
+}
+
+impl ListCompleter {
+    pub fn new(choices: Vec<String>) -> Self {
+        ListCompleter { choices }
+    }
+}
+
+impl Completer for ListCompleter {
+    fn complete<F: Filter>(&mut self, query: &str, limit: usize) -> RingBuffer<String> {
+        let mut completions: Vec<_> = self.choices.iter()
+            .filter_map(|p| F::matched(query, &*p))
+            .collect();
+
+        completions.sort_by(WeightedMatch::cmp);
+        let completions = completions.into_iter().map(|m| m.result).take(limit).collect();
+        RingBuffer::from_vec(completions)
+    }
+}

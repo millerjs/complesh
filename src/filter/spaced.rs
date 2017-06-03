@@ -1,5 +1,6 @@
-use ::util::{emphasize, expand_user, find_all};
+use ::util::{emphasize, expand_user};
 use ::filter::{WeightedMatch, Filter};
+use nlp_tokenize::{WhitePunctTokenizer, Tokenizer};
 
 pub enum SpacedFilter {}
 
@@ -10,7 +11,7 @@ impl SpacedFilter {
         let mut result = String::with_capacity(value.len());
 
         let mut c_query_opt = query.pop();
-        let mut run = 0;
+        let mut run = true;
         let mut weight = 0.0;
 
         for c_value in value.to_string().chars() {
@@ -20,16 +21,14 @@ impl SpacedFilter {
                 if c_query_lower == c_value_lower {
                     result += &*emphasize(c_value);
                     c_query_opt = query.pop();
-                    if run > 0 {
-                        weight += 1.0;
-                    }
-                    run += 1;
+                    weight += if run { 2.0 } else { 1.0 };
+                    run = true;
                 } else {
-                    run = 0;
+                    run = false;
                     result.push(c_value);
                 }
             } else {
-                run = 0;
+                run = false;
                 result.push(c_value);
             }
         }
@@ -61,10 +60,12 @@ impl Filter for SpacedFilter {
             Some(m) => vec![m],
         };
 
-        matches.extend(find_all(value, "/").into_iter()
-                       .filter_map(|index| SpacedFilter::offset_match(query, value, index))
-                       .collect::<Vec<_>>());
+        let tokens = WhitePunctTokenizer::new().tokenize(value);
+        let token_offset_results = tokens.into_iter()
+            .filter_map(|token| SpacedFilter::offset_match(query, value, token.0))
+            .collect::<Vec<_>>();
 
+        matches.extend(token_offset_results);
         matches.sort_by(WeightedMatch::cmp);
         matches.into_iter().nth(0)
     }
