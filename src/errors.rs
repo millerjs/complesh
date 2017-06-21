@@ -1,4 +1,5 @@
-use std::io;
+use std::{io, result};
+use nix;
 
 quick_error! {
     #[derive(Debug)]
@@ -13,6 +14,9 @@ quick_error! {
             cause(err)
         }
 
+        /// Wrapper for nix::Error without context
+        NixError(err: nix::Error) { from() cause(err) }
+
         /// General error
         Error(err: String) {
             display("{}", err)
@@ -21,3 +25,6 @@ quick_error! {
         }
     }
 }
+
+
+pub type Result<T> = result::Result<T, Error>;

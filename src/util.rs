@@ -10,6 +10,7 @@ use termion::raw::CONTROL_SEQUENCE_TIMEOUT;
 use termion::style::{self, Underline, Bold};
 use termion::terminal_size;
 use std::env;
+use ::errors::Result;
 
 pub fn log<D>(value: D) where D: Display {
     use std::io::prelude::*;
@@ -58,13 +59,13 @@ pub fn sync_cursor_pos(stdout: &mut Stdout) -> io::Result<(u16, u16)> {
 
 
 /// Sends SIGWINCH to parent process to get it to redraw as necessary
-pub fn redraw_window() {
-    signal::kill(unistd::getppid(), signal::Signal::SIGWINCH).unwrap();
+pub fn redraw_window() -> Result<()> {
+    Ok(signal::kill(unistd::getppid(), signal::Signal::SIGWINCH)?)
 }
 
 
-pub fn window_height() -> u16 {
-    terminal_size().unwrap().1
+pub fn window_height() -> Result<u16> {
+    Ok(terminal_size()?.1)
 }
 
 pub fn expand_user(path: &str) -> String {
@@ -83,26 +84,24 @@ pub fn emphasize<D: Display>(value: D) -> String {
     format!("{}{}{}{}{}{}", Fg(Green), Underline, Bold, value, Fg(color::Reset), style::Reset)
 }
 
-pub fn within_dir<F, T>(path: &str, f: F) -> Option<T>
-    where F: FnOnce() -> T
-{
-    let cwd = env::current_dir().unwrap();
-    if env::set_current_dir(path).is_err() { return None };
+pub fn within_dir<F: FnOnce() -> T, T>(path: &str, f: F) -> Result<T> {
+    let cwd = env::current_dir()?;
+    env::set_current_dir(path)?;
     let result = f();
-    env::set_current_dir(cwd).unwrap();
-    Some(result)
+    env::set_current_dir(cwd)?;
+    Ok(result)
 }
 
-pub fn git_root(path: &str) -> Option<String> {
+pub fn git_root(path: &str) -> Result<String> {
     within_dir(path, || {
         Command::new("git").arg("rev-parse").arg("--show-toplevel").output()
-            .map(|output| String::from_utf8(output.stdout).unwrap())
-            .map(|path| if path.trim().is_empty() { None } else { Some(path.trim().to_string()) })
-            .unwrap_or(None)
-    }).unwrap()
+            .map(|output| String::from_utf8(output.stdout))
+            .and_then(|path| Ok(path.unwrap().trim().to_string()))
+            .unwrap_or(String::new())
+    })
 }
 
 #[test]
 fn test_git_root() {
-    assert!(git_root(".").is_some());
+    assert!(git_root(".").is_ok());
 }

@@ -1,17 +1,15 @@
-use ::completer::Completer;
-use ::filter::{Filter, WeightedMatch};
+use ::completer::{Completer, CompleterBase};
+use ::filter::Filter;
 use ::ring_buffer::RingBuffer;
 use ::util::git_root;
 use crossbeam::sync::MsQueue;
 use ignore::WalkState::Continue;
 use ignore::{WalkBuilder, DirEntry};
-use rayon::prelude::*;
-use std::collections::HashMap;
 use std::env::home_dir;
 use std::sync::Arc;
 
 pub struct GitCompleter {
-    cache: HashMap<String, Vec<String>>,
+    base: CompleterBase,
     pub max_depth: usize,
     pub root: String,
 }
@@ -23,7 +21,7 @@ fn walk_dir_ignore(path: &str, max_depth: usize) -> Vec<String> {
     let walker = WalkBuilder::new(path).threads(8).max_depth(Some(max_depth)).build_parallel();
     walker.run(|| {
         let queue = queue.clone();
-        Box::new(move |result| { queue.push(Some(result.unwrap())); Continue })
+        Box::new(move |result| { if let Ok(res) = result {queue.push(Some(res))}; Continue })
     });
     queue.push(None);
 
@@ -37,7 +35,7 @@ fn walk_dir_ignore(path: &str, max_depth: usize) -> Vec<String> {
 impl GitCompleter {
     pub fn new() -> Self {
         GitCompleter {
-            cache: HashMap::new(),
+            base: CompleterBase::new(),
             root: ".".to_string(),
             max_depth: 32,
         }
@@ -54,19 +52,11 @@ impl GitCompleter {
             self.root = "/".to_string();
         } else if query.starts_with("./") {
             self.root = ".".to_string()
-        } else if let Some(root) = git_root(".") {
+        } else if let Ok(root) = git_root(".") {
             self.root = root;
         } else {
             self.root = ".".to_string();
         }
-    }
-
-    fn cache<'a>(&'a mut self) -> &'a Vec<String>{
-        if !self.cache.contains_key(&self.root) {
-            let paths = walk_dir_ignore(&*self.root, self.max_depth);
-            self.cache.insert(self.root.clone(), paths);
-        }
-        &self.cache[&self.root]
     }
 }
 
@@ -74,17 +64,7 @@ impl Completer for GitCompleter {
     fn complete<F: Filter>(&mut self, query: &str, limit: usize) -> RingBuffer<String> {
         self.update_root(query);
         let root = self.root.clone() + "/";
-
-        let mut completions: Vec<_> = self.cache().par_iter()
-            .map(|p| p.replace(&*root, ""))
-            .filter_map(|p| F::matched(query, &*p))
-            .collect();
-
-        completions.sort_by(WeightedMatch::cmp);
-        RingBuffer::from_vec(
-            completions.into_iter()
-                .map(|comp| comp.result.to_string())
-                .take(limit)
-                .collect())
+        let depth = self.max_depth;
+        self.base.complete::<F, _>(query, &*root, limit, || { walk_dir_ignore(&*root, depth) })
     }
 }

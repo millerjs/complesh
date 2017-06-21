@@ -4,6 +4,7 @@ use termion::{clear, terminal_size};
 use std::io::{Write, Stdout, stdout};
 use std::fmt::Display;
 use std::cmp::{max, min};
+use ::errors::Result;
 
 const MIN_HEIGHT: u16 = 5;
 
@@ -31,60 +32,60 @@ impl Dropdown {
         }
     }
 
-    pub fn goto_origin(&mut self) -> &mut Self {
-        write!(self.stdout, "{}", self.origin).unwrap();
-        self
+    pub fn goto_origin(&mut self) -> Result<&mut Self> {
+        write!(self.stdout, "{}", self.origin)?;
+        Ok(self)
     }
 
-    pub fn resize(&mut self) -> &mut Self {
-        self.height = max(MIN_HEIGHT, min(util::window_height() - self.start.1, self.max_height));
-        self
+    pub fn resize(&mut self) -> Result<&mut Self> {
+        self.height = max(MIN_HEIGHT, min(util::window_height()? - self.start.1, self.max_height));
+        Ok(self)
     }
 
-    pub fn reset(&mut self) -> &mut Self {
-        self.resize().goto_origin();
+    pub fn reset(&mut self) -> Result<&mut Self> {
+        self.resize()?.goto_origin()?;
         for _ in 0..(self.height+1) {
-            self.write(format!("{}\n", clear::CurrentLine));
+            self.write(format!("{}\n", clear::CurrentLine))?;
         }
         self.origin.1 = min(self.origin.1, terminal_size().unwrap().1 - self.height);
-        self.goto_origin();
-        self
+        self.goto_origin()?;
+        Ok(self)
     }
 
-    pub fn clearline(&mut self) -> &mut Self {
-        write!(self.stdout, "{}\r", clear::CurrentLine).unwrap();
-        self
+    pub fn clearline(&mut self) -> Result<&mut Self> {
+        write!(self.stdout, "{}\r", clear::CurrentLine)?;
+        Ok(self)
     }
 
-    pub fn write<D>(&mut self, value: D) -> &mut Self where D: Display {
-        write!(self.stdout, "{}", value).unwrap();
-        self
+    pub fn write<D: Display>(&mut self, value: D) -> Result<&mut Self> {
+        write!(self.stdout, "{}", value)?;
+        Ok(self)
     }
 
-    pub fn writeln<D>(&mut self, value: D) -> &mut Self where D: Display {
-        self.write(Down(1)).clearline().write(value)
+    pub fn writeln<D: Display>(&mut self, value: D) -> Result<&mut Self> {
+        self.write(Down(1))?.clearline()?.write(value)
     }
 
-    pub fn flush(&mut self) -> &mut Self {
-        self.stdout.flush().unwrap();
-        self
+    pub fn flush(&mut self) -> Result<&mut Self> {
+        self.stdout.flush()?;
+        Ok(self)
     }
 
-    pub fn set_cursor(&mut self, x: u16) {
-        write!(self.stdout, "\r{}", Right(x)).unwrap();
-        self.flush();
+    pub fn set_cursor(&mut self, x: u16) -> Result<&mut Self> {
+        write!(self.stdout, "\r{}", Right(x))?;
+        self.flush()
     }
 
-    pub fn teardown(&mut self) {
-        util::redraw_window();
-        self.reset();
+    pub fn teardown(&mut self) -> Result<&mut Self> {
+        util::redraw_window()?;
+        self.reset()?;
         let start = self.start;
-        self.write(start);
+        self.write(start)
     }
 }
 
 impl Drop for Dropdown {
     fn drop(&mut self) {
-        self.teardown()
+        self.teardown().unwrap();
     }
 }

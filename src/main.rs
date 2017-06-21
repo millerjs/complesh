@@ -9,26 +9,25 @@ use complesh::dropdown::Dropdown;
 use complesh::completer::{Completer, MixedCompleter, ListCompleter};
 use complesh::prompt::DropdownPrompt;
 use complesh::readkeys::Readkeys;
+use complesh::errors::Result;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::stdout;
 use termion::color::{self, Blue, Fg};
 
-fn run<C>(mut prompt: DropdownPrompt<C>, output_path: Option<&str>)
+fn run<C>(mut prompt: DropdownPrompt<C>, output_path: Option<&str>) -> Result<()>
     where C: Completer
 {
-    let completion = match prompt.prompt() {
-        Some(completion) => completion,
-        None => return,
-    };
+    let completion = prompt.prompt()?.unwrap_or(String::new());
 
     if let Some(path) = output_path {
         File::create(path).unwrap().write_all(completion.as_bytes()).unwrap();
     } else {
         stdout().write_all(completion.as_bytes()).unwrap();
     }
-}
 
+    Ok(())
+}
 
 fn main() {
     let matches = App::new("complesh")
@@ -66,7 +65,7 @@ fn main() {
     let input       = Readkeys::new(beginning.clone());
     let prompt_str  = format!("{}complesh: {}", Fg(Blue), Fg(color::Reset));
 
-    if let Some(choice_string) = matches.value_of("CHOICES") {
+    let res = if let Some(choice_string) = matches.value_of("CHOICES") {
         let choices = choice_string.split_whitespace().map(str::to_string).collect();
         let completer = Box::new(ListCompleter::new(choices));
         run(DropdownPrompt::new(prompt_str, input, output, completer), output_path)
@@ -75,4 +74,7 @@ fn main() {
         run(DropdownPrompt::new(prompt_str, input, output, completer), output_path)
     };
 
+    if let Err(error) = res {
+        writeln!(&mut std::io::stderr(), "Complesh Error: {}", error).unwrap();
+    }
 }

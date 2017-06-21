@@ -6,6 +6,8 @@ use ::readkeys::{Readkeys, ReadEvent, Printable};
 use ::ring_buffer::RingBuffer;
 use ::filter::SpacedFilter;
 
+use ::errors::Result;
+
 pub struct DropdownPrompt<C: Completer> {
     dropdown: Dropdown,
     prompt: String,
@@ -36,53 +38,59 @@ impl<C> DropdownPrompt<C> where C: Completer {
         format!("{}{}{}", clear::CurrentLine, self.prompt, self.readkeys.value)
     }
 
-    fn render_prompt(&mut self) {
+    fn render_prompt(&mut self) -> Result<()> {
         let prompt_line = self.prompt_line();
-        self.dropdown.goto_origin().write(prompt_line).flush();
+        self.dropdown.goto_origin()?.write(prompt_line)?.flush()?;
         let cursor = self.readkeys.cursor;
-        self.dropdown.set_cursor((self.prompt.width() + cursor) as u16);
+        self.dropdown.set_cursor((self.prompt.width() + cursor) as u16)?;
+        Ok(())
     }
 
-    fn render_dropdown(&mut self) {
+    fn render_dropdown(&mut self) -> Result<()> {
         let mut n_lines = 0;
         let lines = self.values.iter();
         let max_lines = self.max_lines();
 
         for line in lines.take(max_lines) {
             let prefix = if n_lines == 0 {"-> "} else {"   "};
-            self.dropdown.writeln(format!("{}{}", prefix, line));
+            self.dropdown.writeln(format!("{}{}", prefix, line))?;
             n_lines += 1;
         }
 
         for _ in 0..(max_lines as i64 - n_lines) {
-            self.dropdown.writeln("");
+            self.dropdown.writeln("")?;
         }
+        Ok(())
     }
 
-    fn prompt_next<'a>(&'a mut self) -> &'a ReadEvent {
-        self.render_dropdown();
-        self.render_prompt();
-        self.readkeys.recv()
+    fn prompt_next<'a>(&'a mut self) -> Result<&'a ReadEvent> {
+        self.render_dropdown()?;
+        self.render_prompt()?;
+        Ok(self.readkeys.recv())
     }
 
     fn padded(&self) -> String {
         format!("{} ", self.current())
     }
 
-    pub fn prompt(&mut self) -> Option<String> {
+    fn readkeys_padded(&self) -> String {
+        format!("{} ", self.readkeys.value)
+    }
+
+    pub fn prompt(&mut self) -> Result<Option<String>> {
         self.complete();
 
         // If there's only one option on the fist complete, then
         // assume it's correct
-        if self.values.len() == 1 { return Some(self.padded()) }
+        if self.values.len() == 1 { return Ok(Some(self.padded())) }
 
-        self.dropdown.reset();
+        self.dropdown.reset()?;
         loop {
-            match *self.prompt_next() {
-                ReadEvent::Exit                => return None,
-                ReadEvent::Submit              => return Some(self.padded()),
-                ReadEvent::Tab                 => return Some(self.padded()),
-                ReadEvent::Key(Key::Ctrl('j')) => return Some(format!("{} ", self.readkeys.value)),
+            match *self.prompt_next()? {
+                ReadEvent::Exit                => return Ok(None),
+                ReadEvent::Submit              => return Ok(Some(self.padded())),
+                ReadEvent::Tab                 => return Ok(Some(self.padded())),
+                ReadEvent::Key(Key::Ctrl('j')) => return Ok(Some(self.readkeys_padded())),
                 ReadEvent::Key(Key::Ctrl('n')) => self.values.forward(),
                 ReadEvent::Key(Key::Down)      => self.values.forward(),
                 ReadEvent::Key(Key::Ctrl('p')) => self.values.back(),
