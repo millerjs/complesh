@@ -1,15 +1,14 @@
+use ::completer::Completer;
+use ::filter::{Filter, WeightedMatch};
+use ::ring_buffer::RingBuffer;
+use ::util::git_root;
+use crossbeam::sync::MsQueue;
+use ignore::WalkState::Continue;
+use ignore::{WalkBuilder, DirEntry};
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::env::home_dir;
-use ::completer::Completer;
-use ::ring_buffer::RingBuffer;
-use ::filter::{Filter, WeightedMatch};
-use ::util::git_root;
-use ignore;
 use std::sync::Arc;
-
-use crossbeam::sync::MsQueue;
-use ignore::WalkBuilder;
-use ignore::WalkState::Continue;
 
 pub struct GitCompleter {
     cache: HashMap<String, Vec<String>>,
@@ -18,7 +17,7 @@ pub struct GitCompleter {
 }
 
 fn walk_dir_ignore(path: &str, max_depth: usize) -> Vec<String> {
-    let queue: Arc<MsQueue<Option<ignore::DirEntry>>> = Arc::new(MsQueue::new());
+    let queue: Arc<MsQueue<Option<DirEntry>>> = Arc::new(MsQueue::new());
     let stdout_queue = queue.clone();
 
     let walker = WalkBuilder::new(path).threads(8).max_depth(Some(max_depth)).build_parallel();
@@ -40,7 +39,7 @@ impl GitCompleter {
         GitCompleter {
             cache: HashMap::new(),
             root: ".".to_string(),
-            max_depth: 5,
+            max_depth: 32,
         }
     }
 
@@ -76,7 +75,7 @@ impl Completer for GitCompleter {
         self.update_root(query);
         let root = self.root.clone() + "/";
 
-        let mut completions: Vec<_> = self.cache().iter()
+        let mut completions: Vec<_> = self.cache().par_iter()
             .map(|p| p.replace(&*root, ""))
             .filter_map(|p| F::matched(query, &*p))
             .collect();

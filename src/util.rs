@@ -95,14 +95,14 @@ pub fn within_dir<F, T>(path: &str, f: F) -> Option<T>
 
 pub fn git_root(path: &str) -> Option<String> {
     within_dir(path, || {
-        match Command::new("git").arg("rev-parse").arg("--show-toplevel").output() {
-            Ok(path) => Some(String::from_utf8(path.stdout).unwrap().trim().to_string()),
-            Err(_) => None,
-        }
+        Command::new("git").arg("rev-parse").arg("--show-toplevel").output()
+            .map(|output| String::from_utf8(output.stdout).unwrap())
+            .map(|path| if path.trim().is_empty() { None } else { Some(path.trim().to_string()) })
+            .unwrap_or(None)
     }).unwrap()
 }
 
 #[test]
 fn test_git_root() {
-    assert!(git_root(".").is_some())
+    assert!(git_root(".").is_some());
 }

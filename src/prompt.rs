@@ -32,8 +32,12 @@ impl<C> DropdownPrompt<C> where C: Completer {
         (self.dropdown.height - 1) as usize
     }
 
+    fn prompt_line(&self) -> String {
+        format!("{}{}{}", clear::CurrentLine, self.prompt, self.readkeys.value)
+    }
+
     fn render_prompt(&mut self) {
-        let prompt_line = format!("{}{}{}", clear::CurrentLine, self.prompt, self.readkeys.value);
+        let prompt_line = self.prompt_line();
         self.dropdown.goto_origin().write(prompt_line).flush();
         let cursor = self.readkeys.cursor;
         self.dropdown.set_cursor((self.prompt.width() + cursor) as u16);
@@ -41,23 +45,17 @@ impl<C> DropdownPrompt<C> where C: Completer {
 
     fn render_dropdown(&mut self) {
         let mut n_lines = 0;
-        let mut lines = self.values.iter();
+        let lines = self.values.iter();
         let max_lines = self.max_lines();
 
-        if let Some(line) = lines.next() {
-            self.dropdown.writeln(format!("-> {}", line));
-            n_lines += 1;
-        }
-
         for line in lines.take(max_lines) {
-            self.dropdown.writeln(format!("   {}", line));
+            let prefix = if n_lines == 0 {"-> "} else {"   "};
+            self.dropdown.writeln(format!("{}{}", prefix, line));
             n_lines += 1;
         }
 
-        if n_lines < max_lines {
-            for _ in 0..(max_lines - n_lines) {
-                self.dropdown.writeln("");
-            }
+        for _ in 0..(max_lines as i64 - n_lines) {
+            self.dropdown.writeln("");
         }
     }
 
@@ -84,6 +82,7 @@ impl<C> DropdownPrompt<C> where C: Completer {
                 ReadEvent::Exit                => return None,
                 ReadEvent::Submit              => return Some(self.padded()),
                 ReadEvent::Tab                 => return Some(self.padded()),
+                ReadEvent::Key(Key::Ctrl('j')) => return Some(format!("{} ", self.readkeys.value)),
                 ReadEvent::Key(Key::Ctrl('n')) => self.values.forward(),
                 ReadEvent::Key(Key::Down)      => self.values.forward(),
                 ReadEvent::Key(Key::Ctrl('p')) => self.values.back(),

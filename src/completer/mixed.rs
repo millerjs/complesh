@@ -1,16 +1,16 @@
-use ::completer::{Completer, GitCompleter, GlobCompleter};
+use ::completer::{Completer, GitCompleter, RecursiveCompleter};
 use ::ring_buffer::RingBuffer;
 use ::filter::Filter;
 use ::util::git_root;
 
 pub struct MixedCompleter {
     git: GitCompleter,
-    glob: GlobCompleter,
+    recursive: RecursiveCompleter,
 }
 
 impl MixedCompleter {
     pub fn new() -> Self {
-        Self { git: GitCompleter::new(), glob: GlobCompleter{} }
+        Self { git: GitCompleter::new(), recursive: RecursiveCompleter::default() }
     }
 }
 
@@ -19,7 +19,7 @@ impl Completer for MixedCompleter {
         if git_root(".").is_some() {
             self.git.complete::<F>(query, limit)
         } else {
-            self.glob.complete::<F>(query, limit)
+            self.recursive.complete::<F>(query, limit)
         }
     }
 }

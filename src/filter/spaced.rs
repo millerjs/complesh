@@ -2,6 +2,10 @@ use ::util::{emphasize, expand_user};
 use ::filter::{WeightedMatch, Filter};
 use nlp_tokenize::{WhitePunctTokenizer, Tokenizer};
 
+lazy_static! {
+    static ref TOKENIZER: WhitePunctTokenizer = WhitePunctTokenizer::new();
+}
+
 pub enum SpacedFilter {}
 
 impl SpacedFilter {
@@ -37,6 +41,10 @@ impl SpacedFilter {
             result = result[2..].to_string();
         }
 
+        if result.starts_with(".") {
+            weight -= 100.0;
+        }
+
         if query.is_empty() {
             let weight = weight / (value.len() as f32).sqrt();
             Some(WeightedMatch { result, weight, original })
@@ -60,7 +68,7 @@ impl Filter for SpacedFilter {
             Some(m) => vec![m],
         };
 
-        let tokens = WhitePunctTokenizer::new().tokenize(value);
+        let tokens = TOKENIZER.tokenize(value);
         let token_offset_results = tokens.into_iter()
             .filter_map(|token| SpacedFilter::offset_match(query, value, token.0))
             .collect::<Vec<_>>();
