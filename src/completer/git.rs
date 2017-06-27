@@ -14,11 +14,11 @@ pub struct GitCompleter {
     pub root: String,
 }
 
-fn walk_dir_ignore(path: &str, max_depth: usize) -> Vec<String> {
+fn walk_dir_ignore(root: &str, max_depth: usize) -> Vec<String> {
     let queue: Arc<MsQueue<Option<DirEntry>>> = Arc::new(MsQueue::new());
     let stdout_queue = queue.clone();
 
-    let walker = WalkBuilder::new(path).threads(8).max_depth(Some(max_depth)).build_parallel();
+    let walker = WalkBuilder::new(root).threads(8).max_depth(Some(max_depth)).build_parallel();
     walker.run(|| {
         let queue = queue.clone();
         Box::new(move |result| { if let Ok(res) = result {queue.push(Some(res))}; Continue })
@@ -27,7 +27,7 @@ fn walk_dir_ignore(path: &str, max_depth: usize) -> Vec<String> {
 
     let mut paths = vec![];
     while let Some(dent) = stdout_queue.pop() {
-        paths.push(dent.path().to_string_lossy().to_string())
+        paths.push(dent.path().to_string_lossy().to_string().replace(root, ""))
     }
     paths
 }
@@ -61,6 +61,10 @@ impl GitCompleter {
 }
 
 impl Completer for GitCompleter {
+    fn label(&self) -> String {
+        "git".to_string()
+    }
+
     fn complete<F: Filter>(&mut self, query: &str, limit: usize) -> RingBuffer<String> {
         self.update_root(query);
         let root = self.root.clone() + "/";

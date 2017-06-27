@@ -1,12 +1,12 @@
-use termion::clear;
-use termion::event::Key;
-use ::dropdown::Dropdown;
 use ::completer::Completer;
+use ::dropdown::Dropdown;
+use ::errors::Result;
+use ::filter::SpacedFilter;
 use ::readkeys::{Readkeys, ReadEvent, Printable};
 use ::ring_buffer::RingBuffer;
-use ::filter::SpacedFilter;
-
-use ::errors::Result;
+use termion::clear;
+use termion::color::{self, Blue, Fg};
+use termion::event::Key;
 
 pub struct DropdownPrompt<C: Completer> {
     dropdown: Dropdown,
@@ -34,11 +34,16 @@ impl<C> DropdownPrompt<C> where C: Completer {
         (self.dropdown.height - 1) as usize
     }
 
-    fn prompt_line(&self) -> String {
+    fn update_prompt(&mut self) {
+        self.prompt = format!("{}{}: {}", Fg(Blue), self.completer.label(), Fg(color::Reset));
+    }
+
+    fn prompt_line(&mut self) -> String {
         format!("{}{}{}", clear::CurrentLine, self.prompt, self.readkeys.value)
     }
 
     fn render_prompt(&mut self) -> Result<()> {
+        self.update_prompt();
         let prompt_line = self.prompt_line();
         self.dropdown.goto_origin()?.write(prompt_line)?.flush()?;
         let cursor = self.readkeys.cursor;
@@ -64,9 +69,13 @@ impl<C> DropdownPrompt<C> where C: Completer {
     }
 
     fn prompt_next<'a>(&'a mut self) -> Result<&'a ReadEvent> {
-        self.render_dropdown()?;
-        self.render_prompt()?;
+        self.render()?;
         Ok(self.readkeys.recv())
+    }
+
+    fn render(&mut self) -> Result<()> {
+        self.render_dropdown()?;
+        self.render_prompt()
     }
 
     fn padded(&self) -> String {
@@ -77,25 +86,31 @@ impl<C> DropdownPrompt<C> where C: Completer {
         format!("{} ", self.readkeys.value)
     }
 
+    fn toggle_mode(&mut self) {
+        self.completer.toggle_mode();
+        self.complete();
+    }
+
     pub fn prompt(&mut self) -> Result<Option<String>> {
         self.complete();
 
-        // If there's only one option on the fist complete, then
+        // If there's only one option on the first complete, then
         // assume it's correct
         if self.values.len() == 1 { return Ok(Some(self.padded())) }
 
         self.dropdown.reset()?;
         loop {
             match *self.prompt_next()? {
-                ReadEvent::Exit                => return Ok(None),
-                ReadEvent::Submit              => return Ok(Some(self.padded())),
-                ReadEvent::Tab                 => return Ok(Some(self.padded())),
-                ReadEvent::Key(Key::Ctrl('j')) => return Ok(Some(self.readkeys_padded())),
-                ReadEvent::Key(Key::Ctrl('n')) => self.values.forward(),
-                ReadEvent::Key(Key::Down)      => self.values.forward(),
-                ReadEvent::Key(Key::Ctrl('p')) => self.values.back(),
-                ReadEvent::Key(Key::Up)        => self.values.back(),
-                _                              => self.complete(),
+                ReadEvent::Exit                 => return Ok(None),
+                ReadEvent::Submit               => return Ok(Some(self.padded())),
+                ReadEvent::Tab                  => return Ok(Some(self.padded())),
+                ReadEvent::Key(Key::Ctrl('j'))  => return Ok(Some(self.readkeys_padded())),
+                ReadEvent::Key(Key::Ctrl('n'))  => self.values.forward(),
+                ReadEvent::Key(Key::Down)       => self.values.forward(),
+                ReadEvent::Key(Key::Ctrl('p'))  => self.values.back(),
+                ReadEvent::Key(Key::Up)         => self.values.back(),
+                ReadEvent::Key(Key::Null)       => self.toggle_mode(),
+                _                               => self.complete(),
             };
         }
     }

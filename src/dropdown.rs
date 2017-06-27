@@ -44,7 +44,7 @@ impl Dropdown {
 
     pub fn reset(&mut self) -> Result<&mut Self> {
         self.resize()?.goto_origin()?;
-        for _ in 0..(self.height+1) {
+        for _ in 0..(self.height) {
             self.write(format!("{}\n", clear::CurrentLine))?;
         }
         self.origin.1 = min(self.origin.1, terminal_size().unwrap().1 - self.height);

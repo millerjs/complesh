@@ -9,7 +9,7 @@ lazy_static! {
 pub enum SpacedFilter {}
 
 impl SpacedFilter {
-    pub fn test(query: &str, value: &str) -> Option<WeightedMatch> {
+    pub fn weigh(query: &str, value: &str) -> Option<WeightedMatch> {
         let original = value.to_string();
         let mut query = expand_user(query).chars().rev().collect::<String>();
         let mut result = String::with_capacity(value.len());
@@ -54,7 +54,7 @@ impl SpacedFilter {
     }
 
     fn offset_match(query: &str, value: &str, offset: usize) -> Option<WeightedMatch> {
-        SpacedFilter::test(query, &value[offset..])
+        SpacedFilter::weigh(query, &value[offset..])
             .map(|m| WeightedMatch { result: format!("{}{}", &value[..offset], m.result), ..m })
     }
 }
@@ -62,7 +62,7 @@ impl SpacedFilter {
 
 impl Filter for SpacedFilter {
     fn matched(query: &str, value: &str) -> Option<WeightedMatch> {
-        let first_match = SpacedFilter::test(query, value);
+        let first_match = SpacedFilter::weigh(query, value);
         let mut matches = match first_match {
             None => return None,
             Some(m) => vec![m],

@@ -56,7 +56,7 @@ fn main() {
              .takes_value(true))
         .get_matches();
 
-    let height      = matches.value_of("HEIGHT").unwrap_or("32").parse()
+    let height      = matches.value_of("HEIGHT").unwrap_or("128").parse()
         .expect("Height must but an integer between 0 and 65535.");
 
     let beginning   = matches.value_of("INPUT").unwrap_or("").to_string();

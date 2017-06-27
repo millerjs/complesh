@@ -5,6 +5,9 @@ use std::collections::HashMap;
 
 pub trait Completer {
     fn complete<F: Filter>(&mut self, query: &str, limit: usize) -> RingBuffer<String>;
+
+    fn toggle_mode(&mut self) {}
+    fn label(&self) -> String;
 }
 
 mod recursive;
