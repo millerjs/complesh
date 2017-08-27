@@ -1,6 +1,7 @@
 use ::util::{emphasize, expand_user};
 use ::filter::{WeightedMatch, Filter};
 use nlp_tokenize::{WhitePunctTokenizer, Tokenizer};
+use std::cmp::max;
 
 lazy_static! {
     static ref TOKENIZER: WhitePunctTokenizer = WhitePunctTokenizer::new();
@@ -17,15 +18,17 @@ impl SpacedFilter {
         let mut c_query_opt = query.pop();
         let mut run = true;
         let mut weight = 0.0;
+        let mut first_char = None;
 
-        for c_value in value.to_string().chars() {
+        for (i, c_value) in value.to_string().chars().enumerate() {
             let c_value_lower: String = c_value.to_lowercase().collect();
             if let Some(c_query) = c_query_opt {
                 let c_query_lower: String = c_query.to_lowercase().collect();
                 if c_query_lower == c_value_lower {
                     result += &*emphasize(c_value);
                     c_query_opt = query.pop();
-                    weight += if run { 2.0 } else { 1.0 };
+                    weight += if run { 4.0 } else { 1.0 };
+                    if first_char.is_none() { first_char = Some(i); }
                     run = true;
                 } else {
                     run = false;
@@ -41,12 +44,9 @@ impl SpacedFilter {
             result = result[2..].to_string();
         }
 
-        if result.starts_with(".") {
-            weight -= 100.0;
-        }
-
         if query.is_empty() {
-            let weight = weight / (value.len() as f32).sqrt();
+            let mut weight = weight / (value.len() as f32).sqrt();
+            if let Some(idx) = first_char { weight *= max(1, idx) as f32 }
             Some(WeightedMatch { result, weight, original })
         } else {
             None
