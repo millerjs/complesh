@@ -68,14 +68,15 @@ impl Completer for MixedCompleter {
         match self.mode {
             Mode::Auto      => if self.git_allowed() { "auto [git]" } else { "auto [rec]" },
             Mode::Git       => "git",
-            Mode::Recursive => "rec",
+            Mode::Recursive => "recursive",
         }.to_string()
     }
 
     fn toggle_mode(&mut self) {
         self.mode = match self.mode {
             Mode::Recursive => Mode::Git,
-            _               => Mode::Recursive,
+            Mode::Git       => Mode::Auto,
+            Mode::Auto      => Mode::Recursive,
         };
     }
 
