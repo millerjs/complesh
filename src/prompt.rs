@@ -92,14 +92,17 @@ impl<C> DropdownPrompt<C> where C: Completer {
     }
 
     fn exit_on_tab(&self) -> bool {
-        !PathBuf::from(&self.current()).is_dir()
+        self.values.len() == 1 && !PathBuf::from(&self.current()).is_dir()
     }
 
     fn tab_to_dir(&mut self) {
         let current = self.current();
         if PathBuf::from(&current).is_dir() {
-            self.readkeys.set_value(current);
+            self.readkeys.set_value(current)
+        } else if let Some(first) = self.values.iter().next() {
+            self.readkeys.set_value(first.without_escape_codes())
         }
+        self.complete()
     }
 
     pub fn prompt(&mut self) -> Result<Option<String>> {
@@ -107,7 +110,9 @@ impl<C> DropdownPrompt<C> where C: Completer {
 
         // If there's only one option on the first complete, then
         // assume it's correct
-        if self.values.len() == 1 { return Ok(Some(self.padded())) }
+        if self.exit_on_tab() {
+            return Ok(Some(self.padded()))
+        }
 
         self.dropdown.reset()?;
         loop {

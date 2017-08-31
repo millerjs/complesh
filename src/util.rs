@@ -1,17 +1,17 @@
-use std::process::Command;
+use ::errors::Result;
 use nix::sys::signal;
 use nix::unistd;
 use std::env::home_dir;
+use std::env;
 use std::fmt::Display;
 use std::io::{self, Write, Stdout, Read, stdin};
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::{SystemTime, Duration};
 use termion::color::{self, Green, Fg};
 use termion::raw::CONTROL_SEQUENCE_TIMEOUT;
 use termion::style::{self, Underline, Bold};
 use termion::terminal_size;
-use std::env;
-use ::errors::Result;
-use std::path::{Path, PathBuf};
 
 pub fn log<D>(value: D) where D: Display {
     use std::io::prelude::*;
@@ -97,6 +97,14 @@ pub fn git_root<P: AsRef<Path>>(path: P) -> Result<String> {
             .and_then(|path| Ok(path.unwrap().trim().to_string()))
             .unwrap_or(String::new())
     })
+}
+
+pub fn absolute_path<P: AsRef<Path>>(path: P) -> PathBuf {
+    if let Ok(cwd) = env::current_dir() {
+        cwd.join(path.as_ref())
+    } else {
+        path.as_ref().to_owned()
+    }
 }
 
 pub fn canonicalize<P: AsRef<Path>>(path: P) -> PathBuf {

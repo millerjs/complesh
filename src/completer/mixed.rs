@@ -1,7 +1,7 @@
 use ::completer::{Completer, GitCompleter, RecursiveCompleter};
 use ::ring_buffer::RingBuffer;
 use ::filter::Filter;
-use ::util::{git_root, search_root, path_string};
+use ::util::{git_root, search_root, path_string, canonicalize};
 use std::path::Path;
 
 pub enum Mode {
@@ -36,7 +36,7 @@ impl MixedCompleter {
 
     fn complete_git<F: Filter>(&mut self, query: &str) -> RingBuffer<String> {
         if self.git_allowed() {
-            self.git.complete::<F>(query)
+            self.git.complete::<F>(&*query)
         } else {
             RingBuffer::from_vec(vec![])
         }
@@ -44,7 +44,7 @@ impl MixedCompleter {
 
     fn complete_auto<F: Filter>(&mut self, query: &str) -> RingBuffer<String> {
         if self.git_allowed() {
-            self.git.complete::<F>(query)
+            self.complete_git::<F>(query)
         } else {
             self.recursive.complete::<F>(query)
         }
@@ -66,9 +66,9 @@ impl MixedCompleter {
 impl Completer for MixedCompleter {
     fn label(&self) -> String {
         match self.mode {
-            Mode::Auto      => if self.git_allowed() { "auto (git)" } else { "auto (recursive)" },
+            Mode::Auto      => if self.git_allowed() { "auto [git]" } else { "auto [rec]" },
             Mode::Git       => "git",
-            Mode::Recursive => "recursive",
+            Mode::Recursive => "rec",
         }.to_string()
     }
 
@@ -81,7 +81,7 @@ impl Completer for MixedCompleter {
 
     fn complete<F: Filter>(&mut self, query: &str) -> RingBuffer<String> {
         self.update_root(query);
-        use ::util::log; log(format!("mixed completer root: {}\n", self.root));
+        let query = &*path_string(canonicalize(query));
 
         match self.mode {
             Mode::Auto      => self.complete_auto::<F>(query),

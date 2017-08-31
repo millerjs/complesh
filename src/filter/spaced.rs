@@ -1,8 +1,8 @@
-use ::util::{emphasize, expand_user};
 use ::filter::{WeightedMatch, Filter};
+use ::util::{canonicalize, path_string};
+use ::util::{emphasize, expand_user};
 use nlp_tokenize::{WhitePunctTokenizer, Tokenizer};
 use std::cmp::max;
-use ::util::{canonicalize, path_string};
 
 lazy_static! {
     static ref TOKENIZER: WhitePunctTokenizer = WhitePunctTokenizer::new();
@@ -29,7 +29,7 @@ impl SpacedFilter {
                 if c_query_lower == c_value_lower {
                     result += &*emphasize(c_value);
                     c_query_opt = query.pop();
-                    weight += if run { 4.0 } else { 1.0 };
+                    weight += if run { 10.0 } else { 1.0 };
                     if first_char.is_none() { first_char = Some(i); }
                     run = true;
                 } else {
