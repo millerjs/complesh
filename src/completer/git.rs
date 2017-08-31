@@ -1,7 +1,7 @@
 use ::completer::{Completer, CompleterBase};
 use ::filter::Filter;
 use ::ring_buffer::RingBuffer;
-use ::util::{git_root, search_root};
+use ::util::{git_root, search_root, path_string};
 use crossbeam::sync::MsQueue;
 use ignore::WalkState::Continue;
 use ignore::{WalkBuilder, DirEntry};
@@ -36,7 +36,7 @@ fn walk_dir_ignore<P: AsRef<Path>>(root: P, max_depth: usize) -> Vec<String> {
             Ok(relative_path) => relative_path,
             _ => path.path(),
         };
-        paths.push(relative_path.to_string_lossy().to_string())
+        paths.push(path_string(relative_path))
     }
     paths
 }
@@ -56,7 +56,7 @@ impl GitCompleter {
         let query_root = search_root(&query);
         self.root = match git_root(query_root) {
             Ok(root) => root,
-            Err(_)   => query.as_ref().to_string_lossy().to_string(),
+            Err(_)   => path_string(query),
         }
     }
 }

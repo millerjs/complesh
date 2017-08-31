@@ -99,19 +99,25 @@ pub fn git_root<P: AsRef<Path>>(path: P) -> Result<String> {
     })
 }
 
-pub fn search_root<P: AsRef<Path>>(path: P) -> PathBuf {
-    let mut path = path.as_ref().to_owned();
+pub fn canonicalize<P: AsRef<Path>>(path: P) -> PathBuf {
+    let path = path.as_ref().to_owned();
     if let Ok(canonical) = path.canonicalize() {
-        path = canonical.to_owned();
-    };
+        canonical.to_owned()
+    } else {
+        path
+    }
+}
 
-    let expanded = expand_user(path);
-    log(format!("\n\nexpanded: {:?}\n", expanded));
+pub fn path_string<P: AsRef<Path>>(path: P) -> String {
+    path.as_ref().to_string_lossy().to_string()
+}
+
+pub fn search_root<P: AsRef<Path>>(path: P) -> PathBuf {
+    let expanded = canonicalize(expand_user(path));
     if expanded.is_dir() {
         return expanded
     }
     if let Some(parent) = expanded.parent() {
-        log(format!("parent: {:?}\n", parent));
         if parent.is_dir() {
             return parent.to_owned()
         }

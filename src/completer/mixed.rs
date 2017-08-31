@@ -1,7 +1,7 @@
 use ::completer::{Completer, GitCompleter, RecursiveCompleter};
 use ::ring_buffer::RingBuffer;
 use ::filter::Filter;
-use ::util::{git_root, search_root};
+use ::util::{git_root, search_root, path_string};
 use std::path::Path;
 
 pub enum Mode {
@@ -59,9 +59,8 @@ impl MixedCompleter {
     }
 
     fn update_root<P: AsRef<Path>>(&mut self, query: P) {
-        self.root = search_root(query).to_string_lossy().to_string();
+        self.root = path_string(search_root(query));
     }
-
 }
 
 impl Completer for MixedCompleter {

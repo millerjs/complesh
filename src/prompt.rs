@@ -4,6 +4,7 @@ use ::errors::Result;
 use ::filter::SpacedFilter;
 use ::readkeys::{Readkeys, ReadEvent, Printable};
 use ::ring_buffer::RingBuffer;
+use std::path::PathBuf;
 use termion::clear;
 use termion::color::{self, Blue, Fg};
 use termion::event::Key;
@@ -90,6 +91,17 @@ impl<C> DropdownPrompt<C> where C: Completer {
         self.complete();
     }
 
+    fn exit_on_tab(&self) -> bool {
+        !PathBuf::from(&self.current()).is_dir()
+    }
+
+    fn tab_to_dir(&mut self) {
+        let current = self.current();
+        if PathBuf::from(&current).is_dir() {
+            self.readkeys.set_value(current);
+        }
+    }
+
     pub fn prompt(&mut self) -> Result<Option<String>> {
         self.complete();
 
@@ -100,16 +112,17 @@ impl<C> DropdownPrompt<C> where C: Completer {
         self.dropdown.reset()?;
         loop {
             match *self.prompt_next()? {
-                ReadEvent::Exit                 => return Ok(None),
-                ReadEvent::Submit               => return Ok(Some(self.padded())),
-                ReadEvent::Tab                  => return Ok(Some(self.padded())),
-                ReadEvent::Key(Key::Ctrl('j'))  => return Ok(Some(self.readkeys_padded())),
-                ReadEvent::Key(Key::Ctrl('n'))  => self.values.forward(),
-                ReadEvent::Key(Key::Down)       => self.values.forward(),
-                ReadEvent::Key(Key::Ctrl('p'))  => self.values.back(),
-                ReadEvent::Key(Key::Up)         => self.values.back(),
-                ReadEvent::Key(Key::Null)       => self.toggle_mode(),
-                _                               => self.complete(),
+                ReadEvent::Exit                      => return Ok(None),
+                ReadEvent::Submit                    => return Ok(Some(self.padded())),
+                ReadEvent::Key(Key::Ctrl('j'))       => return Ok(Some(self.readkeys_padded())),
+                ReadEvent::Key(Key::Ctrl('n'))       => self.values.forward(),
+                ReadEvent::Key(Key::Down)            => self.values.forward(),
+                ReadEvent::Key(Key::Ctrl('p'))       => self.values.back(),
+                ReadEvent::Key(Key::Up)              => self.values.back(),
+                ReadEvent::Key(Key::Null)            => self.toggle_mode(),
+                ReadEvent::Tab if self.exit_on_tab() => return Ok(Some(self.padded())),
+                ReadEvent::Tab                       => self.tab_to_dir(),
+                _                                    => self.complete(),
             };
         }
     }

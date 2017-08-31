@@ -2,6 +2,7 @@ use ::util::{emphasize, expand_user};
 use ::filter::{WeightedMatch, Filter};
 use nlp_tokenize::{WhitePunctTokenizer, Tokenizer};
 use std::cmp::max;
+use ::util::{canonicalize, path_string};
 
 lazy_static! {
     static ref TOKENIZER: WhitePunctTokenizer = WhitePunctTokenizer::new();
@@ -45,7 +46,7 @@ impl SpacedFilter {
             result = result[2..].to_string();
         }
 
-        if query.is_empty() {
+        if query.is_empty() && c_query_opt.is_none() {
             let length_penalty = (value.len() as f32).sqrt();
             let first_char_penalty = match first_char {
                 Some(idx) => max(1, idx) as f32,
@@ -68,7 +69,7 @@ impl SpacedFilter {
 
 impl Filter for SpacedFilter {
     fn matched(query: &str, value: &str) -> Option<WeightedMatch> {
-        let first_match = SpacedFilter::weigh(query, value);
+        let first_match = SpacedFilter::weigh(&*path_string(canonicalize(query)), value);
         let mut matches = match first_match {
             None => return None,
             Some(m) => vec![m],

@@ -1,8 +1,9 @@
 use ::completer::{Completer, CompleterBase};
 use ::ring_buffer::RingBuffer;
 use ::filter::Filter;
-use ::util::search_root;
+use ::util::{search_root, path_string};
 use walkdir::WalkDir;
+use std::path::Path;
 
 pub struct RecursiveCompleter {
     max_depth: usize,
@@ -20,13 +21,23 @@ impl Default for RecursiveCompleter {
     }
 }
 
+impl RecursiveCompleter {
+    fn format_path<P: AsRef<Path>>(path: P) -> String {
+        if path.as_ref().is_dir() {
+            format!("{}/", path_string(path))
+        } else {
+            path_string(path)
+        }
+    }
+}
+
 impl Completer for RecursiveCompleter {
     fn label(&self) -> String {
         "recursive".to_string()
     }
 
     fn complete<F: Filter>(&mut self, query: &str) -> RingBuffer<String> {
-        let root = search_root(query).to_string_lossy().to_string();
+        let root = path_string(search_root(query));
         let (links, depth) = (self.follow_links, self.max_depth);
 
         self.base.complete::<F, _>(query, &*root, || {
@@ -34,7 +45,7 @@ impl Completer for RecursiveCompleter {
                 .follow_links(links)
                 .max_depth(depth)
                 .into_iter()
-                .map(|p| p.unwrap().path().to_str().unwrap().to_string())
+                .map(|p| RecursiveCompleter::format_path(p.unwrap().path()))
                 .collect()
         })
     }
