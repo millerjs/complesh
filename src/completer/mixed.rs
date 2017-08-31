@@ -1,7 +1,8 @@
 use ::completer::{Completer, GitCompleter, RecursiveCompleter};
 use ::ring_buffer::RingBuffer;
 use ::filter::Filter;
-use ::util::git_root;
+use ::util::{git_root, search_root};
+use std::path::Path;
 
 pub enum Mode {
     Git,
@@ -13,45 +14,54 @@ pub struct MixedCompleter {
     git: GitCompleter,
     recursive: RecursiveCompleter,
     mode:  Mode,
+    root: String,
+}
+
+impl Default for MixedCompleter {
+    fn default() -> MixedCompleter {
+        MixedCompleter {
+            git: GitCompleter::default(),
+            recursive: RecursiveCompleter::default(),
+            mode: Mode::Auto,
+            root: String::from("."),
+        }
+    }
 }
 
 impl MixedCompleter {
-    pub fn new() -> Self {
-        Self {
-            git: GitCompleter::new(),
-            recursive: RecursiveCompleter::default(),
-            mode: Mode::Auto,
-        }
-    }
-
     pub fn mode(&mut self, mode: Mode) -> &mut Self {
         self.mode = mode;
         self
     }
 
-    fn complete_git<F: Filter>(&mut self, query: &str, limit: usize) -> RingBuffer<String> {
+    fn complete_git<F: Filter>(&mut self, query: &str) -> RingBuffer<String> {
         if self.git_allowed() {
-            self.git.complete::<F>(query, limit)
+            self.git.complete::<F>(query)
         } else {
             RingBuffer::from_vec(vec![])
         }
     }
 
-    fn complete_auto<F: Filter>(&mut self, query: &str, limit: usize) -> RingBuffer<String> {
+    fn complete_auto<F: Filter>(&mut self, query: &str) -> RingBuffer<String> {
         if self.git_allowed() {
-            self.git.complete::<F>(query, limit)
+            self.git.complete::<F>(query)
         } else {
-            self.recursive.complete::<F>(query, limit)
+            self.recursive.complete::<F>(query)
         }
     }
 
-    fn complete_recursive<F: Filter>(&mut self, query: &str, limit: usize) -> RingBuffer<String> {
-        self.recursive.complete::<F>(query, limit)
+    fn complete_recursive<F: Filter>(&mut self, query: &str) -> RingBuffer<String> {
+        self.recursive.complete::<F>(query)
     }
 
     fn git_allowed(&self) -> bool {
-        !git_root(".").unwrap_or(String::new()).is_empty()
+        !git_root(&*self.root).unwrap_or(String::new()).is_empty()
     }
+
+    fn update_root<P: AsRef<Path>>(&mut self, query: P) {
+        self.root = search_root(query).to_string_lossy().to_string();
+    }
+
 }
 
 impl Completer for MixedCompleter {
@@ -70,11 +80,14 @@ impl Completer for MixedCompleter {
         };
     }
 
-    fn complete<F: Filter>(&mut self, query: &str, limit: usize) -> RingBuffer<String> {
+    fn complete<F: Filter>(&mut self, query: &str) -> RingBuffer<String> {
+        self.update_root(query);
+        use ::util::log; log(format!("mixed completer root: {}\n", self.root));
+
         match self.mode {
-            Mode::Auto      => self.complete_auto::<F>(query, limit),
-            Mode::Git       => self.complete_git::<F>(query, limit),
-            Mode::Recursive => self.complete_recursive::<F>(query, limit),
+            Mode::Auto      => self.complete_auto::<F>(query),
+            Mode::Git       => self.complete_git::<F>(query),
+            Mode::Recursive => self.complete_recursive::<F>(query),
         }
     }
  }

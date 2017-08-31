@@ -17,13 +17,13 @@ impl Completer for ListCompleter {
         "list".to_string()
     }
 
-    fn complete<F: Filter>(&mut self, query: &str, limit: usize) -> RingBuffer<String> {
+    fn complete<F: Filter>(&mut self, query: &str) -> RingBuffer<String> {
         let mut completions: Vec<_> = self.choices.iter()
             .filter_map(|p| F::matched(query, &*p))
             .collect();
 
         completions.sort_by(WeightedMatch::cmp);
-        let completions = completions.into_iter().map(|m| m.result).take(limit).collect();
+        let completions = completions.into_iter().map(|m| m.result).collect();
         RingBuffer::from_vec(completions)
     }
 }

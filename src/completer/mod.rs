@@ -4,7 +4,7 @@ use rayon::prelude::*;
 use std::collections::HashMap;
 
 pub trait Completer {
-    fn complete<F: Filter>(&mut self, query: &str, limit: usize) -> RingBuffer<String>;
+    fn complete<F: Filter>(&mut self, query: &str) -> RingBuffer<String>;
 
     fn toggle_mode(&mut self) {}
     fn label(&self) -> String;
@@ -41,7 +41,7 @@ impl CompleterBase {
         &self.cache[root]
     }
 
-    pub fn complete<F, G>(&mut self, query: &str, root: &str, limit: usize, completer: G)
+    pub fn complete<F, G>(&mut self, query: &str, root: &str, completer: G)
                           -> RingBuffer<String>
         where G: FnOnce() -> Vec<String>, F: Filter
     {
@@ -54,7 +54,6 @@ impl CompleterBase {
 
         let results = completions.into_iter()
             .map(|comp| comp.result.to_string())
-            .take(limit)
             .collect();
 
         RingBuffer::from_vec(results)

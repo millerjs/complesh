@@ -12,7 +12,8 @@ pub enum SpacedFilter {}
 impl SpacedFilter {
     pub fn weigh(query: &str, value: &str) -> Option<WeightedMatch> {
         let original = value.to_string();
-        let mut query = expand_user(query).chars().rev().collect::<String>();
+        let expanded = expand_user(query);
+        let mut query = expanded.to_string_lossy().chars().rev().collect::<String>();
         let mut result = String::with_capacity(value.len());
 
         let mut c_query_opt = query.pop();
@@ -45,8 +46,13 @@ impl SpacedFilter {
         }
 
         if query.is_empty() {
-            let mut weight = weight / (value.len() as f32).sqrt();
-            if let Some(idx) = first_char { weight *= max(1, idx) as f32 }
+            let length_penalty = (value.len() as f32).sqrt();
+            let first_char_penalty = match first_char {
+                Some(idx) => max(1, idx) as f32,
+                None => 1.0,
+            };
+            weight /= length_penalty * first_char_penalty;
+
             Some(WeightedMatch { result, weight, original })
         } else {
             None

@@ -26,8 +26,7 @@ impl<C> DropdownPrompt<C> where C: Completer {
     }
 
     fn complete(&mut self) {
-        let max_lines = self.max_lines();
-        self.values = self.completer.complete::<SpacedFilter>(&self.readkeys.value, max_lines);
+        self.values = self.completer.complete::<SpacedFilter>(&self.readkeys.value);
     }
 
     fn max_lines(&self) -> usize {

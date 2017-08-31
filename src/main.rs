@@ -70,7 +70,7 @@ fn main() {
         let completer = Box::new(ListCompleter::new(choices));
         run(DropdownPrompt::new(prompt_str, input, output, completer), output_path)
     } else {
-        let completer = Box::new(MixedCompleter::new());
+        let completer = Box::new(MixedCompleter::default());
         run(DropdownPrompt::new(prompt_str, input, output, completer), output_path)
     };
 

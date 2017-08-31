@@ -11,11 +11,12 @@ use termion::style::{self, Underline, Bold};
 use termion::terminal_size;
 use std::env;
 use ::errors::Result;
+use std::path::{Path, PathBuf};
 
 pub fn log<D>(value: D) where D: Display {
     use std::io::prelude::*;
     use std::fs::OpenOptions;
-    let path = "complesh.log";
+    let path = "/var/log/complesh/complesh.log";
     let mut file = OpenOptions::new().write(true).create(true).append(true).open(path).unwrap();
     file.write_all(format!("{}", value).as_bytes()).unwrap();
     file.flush().unwrap();
@@ -68,23 +69,20 @@ pub fn window_height() -> Result<u16> {
     Ok(terminal_size()?.1)
 }
 
-pub fn expand_user(path: &str) -> String {
-    if path.starts_with("~/") {
+pub fn expand_user<P: AsRef<Path>>(path: P) -> PathBuf {
+    if let Ok(relative_path) = path.as_ref().strip_prefix("~/") {
         if let Some(home) = home_dir() {
-            home.display().to_string() + &path[2..]
-        } else {
-            path.to_string()
+            return home.join(relative_path)
         }
-    } else {
-        path.to_string()
     }
+    path.as_ref().to_owned()
 }
 
 pub fn emphasize<D: Display>(value: D) -> String {
     format!("{}{}{}{}{}{}", Fg(Green), Underline, Bold, value, Fg(color::Reset), style::Reset)
 }
 
-pub fn within_dir<F: FnOnce() -> T, T>(path: &str, f: F) -> Result<T> {
+pub fn within_dir<F: FnOnce() -> T, P: AsRef<Path>, T>(path: P, f: F) -> Result<T> {
     let cwd = env::current_dir()?;
     env::set_current_dir(path)?;
     let result = f();
@@ -92,13 +90,33 @@ pub fn within_dir<F: FnOnce() -> T, T>(path: &str, f: F) -> Result<T> {
     Ok(result)
 }
 
-pub fn git_root(path: &str) -> Result<String> {
-    within_dir(path, || {
+pub fn git_root<P: AsRef<Path>>(path: P) -> Result<String> {
+    within_dir(path.as_ref(), || {
         Command::new("git").arg("rev-parse").arg("--show-toplevel").output()
             .map(|output| String::from_utf8(output.stdout))
             .and_then(|path| Ok(path.unwrap().trim().to_string()))
             .unwrap_or(String::new())
     })
+}
+
+pub fn search_root<P: AsRef<Path>>(path: P) -> PathBuf {
+    let mut path = path.as_ref().to_owned();
+    if let Ok(canonical) = path.canonicalize() {
+        path = canonical.to_owned();
+    };
+
+    let expanded = expand_user(path);
+    log(format!("\n\nexpanded: {:?}\n", expanded));
+    if expanded.is_dir() {
+        return expanded
+    }
+    if let Some(parent) = expanded.parent() {
+        log(format!("parent: {:?}\n", parent));
+        if parent.is_dir() {
+            return parent.to_owned()
+        }
+    }
+    PathBuf::from(".")
 }
 
 #[test]
