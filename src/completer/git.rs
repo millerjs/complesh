@@ -32,7 +32,11 @@ fn walk_dir_ignore<P: AsRef<Path>>(root: P, max_depth: usize) -> Vec<String> {
 
     let mut paths = vec![];
     while let Some(path) = stdout_queue.pop() {
-        paths.push(path_string(path.path()))
+        let relative_path = match path.path().strip_prefix(root.as_ref()) {
+            Ok(relative_path) => relative_path,
+            _ => path.path(),
+        };
+        paths.push(path_string(relative_path))
     }
     paths
 }
