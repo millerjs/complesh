@@ -107,6 +107,13 @@ pub fn absolute_path<P: AsRef<Path>>(path: P) -> PathBuf {
     }
 }
 
+pub fn strip_root<R: AsRef<Path>, P: AsRef<Path>>(root: R, path: P) -> PathBuf {
+    match path.as_ref().strip_prefix(root.as_ref()) {
+        Ok(relative_path) => relative_path.to_owned(),
+        _ => path.as_ref().to_owned(),
+    }
+}
+
 pub fn canonicalize<P: AsRef<Path>>(path: P) -> PathBuf {
     let path = path.as_ref().to_owned();
     if let Ok(canonical) = path.canonicalize() {

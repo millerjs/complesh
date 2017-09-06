@@ -60,6 +60,7 @@ impl MixedCompleter {
 
     fn update_root<P: AsRef<Path>>(&mut self, query: P) {
         self.root = path_string(search_root(query));
+        self.git.root = self.root.clone();
     }
 }
 

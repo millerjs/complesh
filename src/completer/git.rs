@@ -31,12 +31,8 @@ fn walk_dir_ignore<P: AsRef<Path>>(root: P, max_depth: usize) -> Vec<String> {
     queue.push(None);
 
     let mut paths = vec![];
-    while let Some(path) = stdout_queue.pop() {
-        let relative_path = match path.path().strip_prefix(root.as_ref()) {
-            Ok(relative_path) => relative_path,
-            _ => path.path(),
-        };
-        paths.push(path_string(relative_path))
+    while let Some(dir_entry) = stdout_queue.pop() {
+        paths.push(path_string(dir_entry.path()))
     }
     paths
 }
@@ -69,8 +65,8 @@ impl Completer for GitCompleter {
     fn complete<F: Filter>(&mut self, query: &str) -> RingBuffer<String> {
         self.update_root(query);
         let root = self.root.clone() + "/";
-
         let depth = self.max_depth;
+
         self.base.complete::<F, _>(&*query, &*root, || { walk_dir_ignore(&*root, depth) })
     }
 }

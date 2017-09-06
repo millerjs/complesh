@@ -91,7 +91,7 @@ impl<C> DropdownPrompt<C> where C: Completer {
         self.complete();
     }
 
-    fn exit_on_tab(&self) -> bool {
+    fn singular_file(&self) -> bool {
         self.values.len() == 1 && !PathBuf::from(&self.current()).is_dir()
     }
 
@@ -110,26 +110,26 @@ impl<C> DropdownPrompt<C> where C: Completer {
 
         // If there's only one option on the first complete, then
         // assume it's correct
-        if self.exit_on_tab() {
+        if self.singular_file() {
             return Ok(Some(self.padded()))
         }
 
         self.dropdown.reset()?;
         loop {
             match *self.prompt_next()? {
-                ReadEvent::Exit                      => return Ok(None),
-                ReadEvent::Submit                    => return Ok(Some(self.padded())),
-                ReadEvent::Key(Key::Ctrl('j'))       => return Ok(Some(self.readkeys_padded())),
-                ReadEvent::Key(Key::Ctrl('n'))       => self.values.forward(),
-                ReadEvent::Key(Key::Alt('n'))        => self.values.forward(),
-                ReadEvent::Key(Key::Down)            => self.values.forward(),
-                ReadEvent::Key(Key::Ctrl('p'))       => self.values.back(),
-                ReadEvent::Key(Key::Alt('p'))        => self.values.back(),
-                ReadEvent::Key(Key::Up)              => self.values.back(),
-                ReadEvent::Key(Key::Null)            => self.toggle_mode(),
-                ReadEvent::Tab if self.exit_on_tab() => return Ok(Some(self.padded())),
-                ReadEvent::Tab                       => self.tab_to_dir(),
-                _                                    => self.complete(),
+                ReadEvent::Exit                        => return Ok(None),
+                ReadEvent::Submit                      => return Ok(Some(self.padded())),
+                ReadEvent::Key(Key::Ctrl('j'))         => return Ok(Some(self.readkeys_padded())),
+                ReadEvent::Key(Key::Ctrl('n'))         => self.values.forward(),
+                ReadEvent::Key(Key::Alt('n'))          => self.values.forward(),
+                ReadEvent::Key(Key::Down)              => self.values.forward(),
+                ReadEvent::Key(Key::Ctrl('p'))         => self.values.back(),
+                ReadEvent::Key(Key::Alt('p'))          => self.values.back(),
+                ReadEvent::Key(Key::Up)                => self.values.back(),
+                ReadEvent::Key(Key::Null)              => self.toggle_mode(),
+                ReadEvent::Tab if self.singular_file() => return Ok(Some(self.padded())),
+                ReadEvent::Tab                         => self.tab_to_dir(),
+                _                                      => self.complete(),
             };
         }
     }
